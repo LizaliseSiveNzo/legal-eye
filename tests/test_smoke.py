@@ -37,18 +37,15 @@ def sample_dir(tmp_path: Path) -> Path:
         document.add_paragraph(block)
     document.save(str(tmp_path / "agreement.docx"))
 
-    # pymupdf is already a project dependency (OCR), so the fixture needs no
-    # extra test-only package.
-    import pymupdf
+    from reportlab.lib.pagesizes import LETTER
+    from reportlab.pdfgen import canvas
 
-    pdf = pymupdf.open()
-    page = pdf.new_page(width=612, height=792)  # US Letter, in points
-    y = 72
+    pdf = canvas.Canvas(str(tmp_path / "agreement.pdf"), pagesize=LETTER)
+    y = 720
     for line in SAMPLE.replace("\n\n", "\n").split("\n"):
-        page.insert_text((72, y), line[:95], fontsize=11)
-        y += 18
-    pdf.save(str(tmp_path / "agreement.pdf"))
-    pdf.close()
+        pdf.drawString(72, y, line[:95])
+        y -= 18
+    pdf.save()
 
     return tmp_path
 

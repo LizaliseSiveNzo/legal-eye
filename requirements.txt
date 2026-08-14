@@ -9,3 +9,7 @@ python-dotenv>=1.0.0
 pymupdf>=1.24.0
 pytesseract>=0.3.10
 pillow>=10.0.0
+
+# Test-only dependencies: run the suite with pytest; reportlab generates PDF fixtures.
+pytest>=8.0.0
+reportlab>=4.0.0
