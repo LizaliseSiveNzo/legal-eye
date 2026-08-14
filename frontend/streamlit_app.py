@@ -17,7 +17,7 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from backend.parser import extract_document  # noqa: E402
-from backend.summarizer import estimate_cost, summarize_legal_document  # noqa: E402
+from backend.summarizer import summarize_legal_document  # noqa: E402
 
 st.set_page_config(
     page_title="Legal-Eye — AI Legal Document Review",
@@ -50,14 +50,16 @@ st.markdown(
 
 h1,h2,h3,h4{color:var(--ink);}
 
-/* Top bar */
-.le-topbar{display:flex; justify-content:space-between; align-items:center;
-  padding:14px 20px; background:var(--card); border:1px solid var(--line);
+/* Top bar — white, with the logo centred */
+header[data-testid="stHeader"]{background:#ffffff;}
+.le-topbar{position:relative; display:flex; justify-content:center; align-items:center;
+  padding:14px 20px; background:#ffffff; border:1px solid var(--line);
   border-radius:var(--radius); margin-bottom:36px;}
 .le-brand{display:flex; align-items:center; gap:10px;}
 .le-brand svg{color:var(--brass);}
-.le-wordmark{font-size:17px; font-weight:700; letter-spacing:.06em; color:var(--ink);}
-.le-topnote{font-size:12.5px; color:var(--muted); border:1px solid var(--line);
+.le-wordmark{font-size:18px; font-weight:700; letter-spacing:.06em; color:var(--ink);}
+.le-topnote{position:absolute; right:20px; top:50%; transform:translateY(-50%);
+  font-size:12.5px; color:var(--muted); border:1px solid var(--line);
   padding:6px 12px; border-radius:999px;}
 
 /* Hero */
@@ -86,9 +88,11 @@ h1,h2,h3,h4{color:var(--ink);}
 .le-section p{margin:0; font-size:15px; color:var(--muted); max-width:660px;}
 
 /* Upload panel */
-.le-panelhead{margin:0 0 10px 0;}
+.le-panelhead{display:flex; justify-content:space-between; align-items:flex-end;
+  gap:16px; margin:0 0 10px 0;}
 .le-panelhead h3{margin:0 0 4px 0; font-size:19px;}
 .le-panelhead p{margin:0; font-size:14.5px; color:var(--muted);}
+.le-panelhint{font-size:14.5px; font-style:italic; color:var(--brass-ink); white-space:nowrap;}
 [data-testid="stFileUploaderDropzone"]{
   background:var(--card); border:2px dashed var(--line-strong);
   border-radius:var(--radius); padding:8px;}
@@ -97,13 +101,14 @@ h1,h2,h3,h4{color:var(--ink);}
   line-height:1.55; color:var(--muted); margin-top:14px;}
 .le-privacy svg{flex:none; color:var(--ok); margin-top:1px;}
 
-/* Primary button — .stApp prefix beats Streamlit's own button[kind="primary"] rule */
+/* Primary button — white with brass text */
 .stApp [data-testid="stBaseButton-primary"]{
-  background:var(--ink); border:1px solid var(--ink); border-radius:8px;
-  font-weight:600; padding:0.55rem 1.6rem;}
-.stApp [data-testid="stBaseButton-primary"]:hover{background:var(--ink-soft); border-color:var(--ink-soft);}
-.stApp [data-testid="stBaseButton-primary"]:disabled{background:var(--line);
-  border-color:var(--line); color:var(--muted);}
+  background:#ffffff; color:var(--brass-ink); border:1px solid var(--brass);
+  border-radius:8px; font-weight:600; padding:0.55rem 1.6rem;}
+.stApp [data-testid="stBaseButton-primary"]:hover{
+  background:var(--brass-tint); border-color:var(--brass-ink);}
+.stApp [data-testid="stBaseButton-primary"]:disabled{
+  background:#ffffff; color:var(--muted); border-color:var(--line);}
 
 /* Result card + alerts */
 [data-testid="stVerticalBlockBorderWrapper"]{border-color:var(--line)!important;
@@ -159,6 +164,8 @@ h1,h2,h3,h4{color:var(--ink);}
   .le-steps{grid-template-columns:1fr;}
   .le-grid{grid-template-columns:1fr;}
   .le-why ul{grid-template-columns:1fr;}
+  .le-topnote{display:none;}
+  .le-panelhead{flex-wrap:wrap;}
 }
 @media (prefers-reduced-motion:reduce){
   *, *::before, *::after{transition:none!important; animation:none!important;}
@@ -192,7 +199,7 @@ st.markdown(
   critical clauses and a reproducible risk score out of 10.</p>
   <div class="le-chips">
     <span class="le-chip">PDF · DOCX · TXT</span>
-    <span class="le-chip">≈ $0.03 per document</span>
+    <span class="le-chip">Reproducible risk score</span>
     <span class="le-chip">File deleted after analysis</span>
   </div>
 </div>
@@ -210,8 +217,8 @@ st.markdown(
     <div class="le-stat-label">deterministic checks re-do the arithmetic, dates and quantities</div></div>
   <div class="le-stat"><div class="le-stat-value">3</div>
     <div class="le-stat-label">file formats — PDF, DOCX and TXT, scanned pages included</div></div>
-  <div class="le-stat"><div class="le-stat-value">≈ $0.03</div>
-    <div class="le-stat-label">typical API cost per document, with input and output capped</div></div>
+  <div class="le-stat"><div class="le-stat-value">2</div>
+    <div class="le-stat-label">analysis passes — facts are verified in code before the report is written</div></div>
   <div class="le-stat"><div class="le-stat-value">0</div>
     <div class="le-stat-label">files stored — processed in memory, deleted the moment analysis ends</div></div>
 </div>
@@ -225,8 +232,11 @@ st.markdown(
 st.markdown(
     """
 <div class="le-panelhead">
-  <h3>Start a review</h3>
-  <p>Select a document, then run the analysis. Most documents finish in under a minute.</p>
+  <div>
+    <h3>Start a review</h3>
+    <p>Select a document, then run the analysis. Most documents finish in under a minute.</p>
+  </div>
+  <span class="le-panelhint">Import your document for analysis →</span>
 </div>
 """,
     unsafe_allow_html=True,
@@ -287,8 +297,7 @@ if run and uploaded_file is not None:
             mime="text/markdown",
         )
         st.markdown(
-            f'<div class="le-meta">Input: ~{len(text):,} characters — estimated '
-            f"API cost ≈ ${estimate_cost(len(text)):.3f}</div>",
+            f'<div class="le-meta">Input: ~{len(text):,} characters analyzed</div>',
             unsafe_allow_html=True,
         )
 
@@ -399,13 +408,6 @@ with st.expander("Is my document stored anywhere?"):
         "No. The file is read in memory, written to a temporary location only "
         "while being analyzed, and deleted immediately afterwards. Legal-Eye "
         "never stores, logs or shares your documents."
-    )
-
-with st.expander("What does it cost?"):
-    st.markdown(
-        "Analysis runs in two passes over the DeepSeek API. A typical document "
-        "costs roughly $0.01–$0.05 in API fees; input is capped at 50,000 "
-        "characters and output is capped to keep costs predictable."
     )
 
 with st.expander("Which formats are supported?"):
