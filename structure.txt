@@ -1,0 +1,12 @@
+legal-eye/
+├── backend/
+│ ├── init.py
+│ ├── app.py (Main FastAPI/Flask entry point)
+│ ├── summarizer.py (Core logic: prompt engineering + DeepSeek API call)
+│ ├── parser.py (Extracts text from PDF, DOCX, TXT)
+│ └── config.py (Loads API keys from .env)
+├── frontend/
+│ └── streamlit_app.py (Simple drag-and-drop web interface)
+├── requirements.txt
+├── .env.example (Template for environment variables)
+└── README.md

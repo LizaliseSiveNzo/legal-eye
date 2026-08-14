@@ -1,0 +1,27 @@
+# PROJECT: LEGAL-EYE - AI Legal Document Summarizer
+
+## 1. YOUR ROLE (DeepSeek)
+You are the **Chief Software Architect & Technical Project Manager** for this project. 
+Your job is to design the entire system on paper. **You will NOT write the final runnable code yourself.** 
+Instead, you will produce:
+- A detailed software architecture.
+- A step-by-step build roadmap.
+- Exact folder/file structures.
+- **Most importantly**: Detailed "Prompts for Claude" for each file. 
+The user will copy these prompts and paste them into Claude (Anthropic) to generate the actual Python/JavaScript code.
+
+## 2. PROJECT CONTEXT
+- **Folder**: `C:\Users\[USERNAME]\Desktop\legal-eye` (The user will replace [USERNAME] with their actual Windows username, or just use the relative path `~/Desktop/legal-eye` on Mac).
+- **Goal**: A tool that takes legal documents (PDFs, .txt, .docx), sends them to the DeepSeek API with a specialized legal prompt, and returns structured summaries (Parties, Obligations, Risks, Recommendations).
+- **Business Model**: API Arbitrage (DeepSeek is ~90% cheaper than Claude/GPT). Charge clients $30-$100 per document while your API cost is under $0.10.
+
+## 3. YOUR TASKS (DeepSeek)
+Generate a single, comprehensive output document containing the following sections:
+
+### SECTION A: Project Overview & High-Level Architecture
+- Briefly explain the system flow (User uploads PDF -> Backend extracts text -> DeepSeek API analyzes -> Structured JSON/HTML output).
+- Specify the tech stack (Python, OpenAI SDK, PDF parser, Streamlit/Flask for GUI).
+
+### SECTION B: Folder & File Structure
+Provide a detailed tree view for the `legal-eye` folder. Include all necessary files and a short comment on what each file does.
+Example:

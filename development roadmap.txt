@@ -1,0 +1,42 @@
+
+### SECTION C: Step-by-Step Development Roadmap
+Outline the phases for building this:
+
+- **Phase 1 (Today)**: CLI Script (Command Line). Just a Python script that takes a file path, prints the summary to the terminal. (Profit in < 1 day).
+- **Phase 2 (Day 2)**: Web UI using Streamlit. Allows non-technical clients to upload files and see a nice formatted summary.
+- **Phase 3 (Future)**: Stripe Payments + User Accounts to turn it into a recurring Micro-SaaS.
+
+### SECTION D: The "Secret Sauce" - Legal System Prompt
+Write the exact System Prompt that we will hardcode into `summarizer.py`. 
+Remember:
+- It must be highly structured (Executive Summary, Parties, Obligations, Critical Clauses, Risk Assessment, Recommendations).
+- Include a strict **Legal Disclaimer** in the output.
+- Instruct the AI to be objective and neutral.
+
+### SECTION E: Technical Specifications for Each File
+For every file listed in Section B, provide:
+- The exact imports required.
+- The function signatures (e.g., `def extract_text(file_path: str) -> str:`).
+- The expected logic flow (pseudocode).
+- Configuration details (e.g., reading `DEEPSEEK_API_KEY` from `.env`, using `base_url="https://api.deepseek.com/v1"`).
+
+### SECTION F: THE HAND-OFF - Prompts for Claude (CRITICAL)
+This is the most important section. For each major file/module, write a **highly detailed, production-ready prompt** that the user can copy and paste directly into Claude to generate the exact code. 
+
+You must generate prompts for at least these 4 files:
+1. **Prompt for Claude: `backend/parser.py`** (Explain how to use PyPDF2 or pypdf to extract text, handle errors).
+2. **Prompt for Claude: `backend/summarizer.py`** (Explain how to initialize the OpenAI client for DeepSeek, implement the legal prompt, handle rate limits and token truncation).
+3. **Prompt for Claude: `frontend/streamlit_app.py`** (Explain how to build a clean UI with file upload, a "Summarize" button, and display the formatted Markdown result).
+4. **Prompt for Claude: `requirements.txt` and `.env` setup** (List all dependencies like openai, streamlit, pypdf, python-dotenv).
+
+## 4. CONSTRAINTS & GUIDELINES
+- DeepSeek API uses the OpenAI SDK format. Base URL must be `https://api.deepseek.com/v1`.
+- The summary output must be in Markdown format so it looks good on the web UI.
+- Assume legal documents are up to 50,000 characters. Implement truncation logic if necessary.
+- The user only has $10 in API credit. Make sure the prompts emphasize cost-efficiency (low token usage, prompt caching awareness).
+
+## 5. FINAL OUTPUT FORMAT
+Generate the output with clear headings (e.g., `# SECTION F: Prompt for Claude - summarizer.py`). 
+The user will read your architecture first, then copy the "Prompt for Claude" sections and paste them into Claude to get the actual code files built automatically.
+
+Proceed with the architecture and planning now.
