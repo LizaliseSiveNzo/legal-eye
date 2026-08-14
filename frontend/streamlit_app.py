@@ -132,6 +132,7 @@ header[data-testid="stHeader"]{display:none;}
 [data-testid="stFileUploaderDropzoneInstructions"],
 [data-testid="stFileUploaderDropzoneInstructions"] span,
 [data-testid="stFileUploaderDropzoneInstructions"] small{color:var(--slate) !important;}
+.le-uploadhint{font-size:12.5px; color:var(--muted); margin:6px 0 0 0;}
 
 /* Uploader and download buttons — same white/brass treatment as the primary.
    !important is needed: Streamlit's generated classes outrank plain selectors. */
@@ -151,6 +152,12 @@ header[data-testid="stHeader"]{display:none;}
 [data-testid="stFileUploaderDropzone"] button svg,
 .stApp [data-testid="stDownloadButton"] button svg{
   color:var(--brass-ink) !important; fill:currentColor;}
+/* The native button text differs between Streamlit versions ("Upload" vs
+   "Browse files") — hide it and show our own label instead. */
+[data-testid="stFileUploaderDropzone"] button [data-testid="stMarkdownContainer"],
+[data-testid="stFileUploader"] button [data-testid="stMarkdownContainer"]{display:none;}
+[data-testid="stFileUploaderDropzone"] button::after,
+[data-testid="stFileUploader"] button::after{content:"Import documents";}
 
 /* Notices — white ground, brass rule, ink text. Streamlit's default success
    and warning colours are tinted panels whose text drops out against them. */
@@ -408,6 +415,11 @@ uploaded_files = st.file_uploader(
     "Upload documents (up to 5)",
     type=["pdf", "docx", "txt"],
     accept_multiple_files=True,
+)
+st.markdown(
+    '<div class="le-uploadhint">Drag and drop several files at once, or hold '
+    "Ctrl (⌘ on Mac) while selecting files in the dialog.</div>",
+    unsafe_allow_html=True,
 )
 
 if uploaded_files and len(uploaded_files) > MAX_FILES:
