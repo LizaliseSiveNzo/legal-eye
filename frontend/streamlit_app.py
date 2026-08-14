@@ -5,6 +5,8 @@ Visual system (tokens): ink #14283c / slate #44536a / muted #67748a on paper
 Display type: Georgia serif; body: system sans. Spacing scale 8/16/24/32/48.
 """
 
+import html
+import re
 import sys
 import tempfile
 from datetime import date
@@ -17,7 +19,9 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from backend.parser import extract_document  # noqa: E402
-from backend.summarizer import summarize_legal_document  # noqa: E402
+from backend.summarizer import analyze_legal_document  # noqa: E402
+
+MAX_FILES = 5  # hard cap: the bundle is reviewed as one combined document
 
 st.set_page_config(
     page_title="Legal-Eye — AI Legal Document Review",
@@ -42,7 +46,7 @@ st.markdown(
 .stApp, .stApp button, .stApp input, .stApp textarea{
   font-family:"Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
 }
-.block-container{max-width:1080px; padding-top:1.2rem; padding-bottom:4rem;}
+.block-container{max-width:1080px; padding-top:2.4rem; padding-bottom:4rem;}
 
 /* Chrome hygiene */
 #MainMenu, footer, [data-testid="stToolbar"]{visibility:hidden;}
@@ -50,8 +54,10 @@ st.markdown(
 
 h1,h2,h3,h4{color:var(--ink);}
 
-/* Top bar — white, with the logo centred */
-header[data-testid="stHeader"]{background:#ffffff;}
+/* Top bar — white, with the logo centred. Streamlit's own header is fixed to
+   the viewport and would float over the page on scroll, so it is removed
+   outright rather than recoloured. */
+header[data-testid="stHeader"]{display:none;}
 .le-topbar{position:relative; display:flex; justify-content:center; align-items:center;
   padding:14px 20px; background:#ffffff; border:1px solid var(--line);
   border-radius:var(--radius); margin-bottom:36px;}
@@ -110,10 +116,88 @@ header[data-testid="stHeader"]{background:#ffffff;}
 .stApp [data-testid="stBaseButton-primary"]:disabled{
   background:#ffffff; color:var(--muted); border-color:var(--line);}
 
+/* Widget labels and radio options. Streamlit renders these through generated
+   classes that inherit a default text colour, so they need to be set here or
+   they sit almost invisible against the paper background. */
+[data-testid="stWidgetLabel"] p, [data-testid="stWidgetLabel"] label,
+.stRadio label, [data-testid="stRadio"] label, [data-testid="stRadio"] p,
+.stCheckbox label, .stCheckbox p, [data-testid="stFileUploader"] label{
+  color:var(--ink) !important;}
+[data-testid="stWidgetLabel"] p{
+  font-size:12px !important; font-weight:700 !important; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--brass-ink) !important;}
+[data-testid="stRadio"] label p{font-size:14.5px !important; font-weight:500 !important;}
+[data-testid="stRadio"] [role="radiogroup"]{gap:18px;}
+/* The dropzone's own instruction text washes out the same way. */
+[data-testid="stFileUploaderDropzoneInstructions"],
+[data-testid="stFileUploaderDropzoneInstructions"] span,
+[data-testid="stFileUploaderDropzoneInstructions"] small{color:var(--slate) !important;}
+
+/* Uploader and download buttons — same white/brass treatment as the primary.
+   !important is needed: Streamlit's generated classes outrank plain selectors. */
+[data-testid="stFileUploaderDropzone"] button,
+.stApp [data-testid="stBaseButton-secondary"],
+.stApp [data-testid="baseButton-secondary"],
+.stApp [data-testid="stDownloadButton"] button{
+  background:#ffffff !important; color:var(--brass-ink) !important;
+  border:1px solid var(--brass) !important; border-radius:8px !important;
+  font-weight:600 !important;}
+[data-testid="stFileUploaderDropzone"] button:hover,
+.stApp [data-testid="stBaseButton-secondary"]:hover,
+.stApp [data-testid="baseButton-secondary"]:hover,
+.stApp [data-testid="stDownloadButton"] button:hover{
+  background:var(--brass-tint) !important; border-color:var(--brass-ink) !important;
+  color:var(--brass-ink) !important;}
+[data-testid="stFileUploaderDropzone"] button svg,
+.stApp [data-testid="stDownloadButton"] button svg{
+  color:var(--brass-ink) !important; fill:currentColor;}
+
+/* Notices — white ground, brass rule, ink text. Streamlit's default success
+   and warning colours are tinted panels whose text drops out against them. */
+.le-note{display:flex; gap:11px; align-items:flex-start; background:var(--card);
+  border:1px solid var(--line); border-left:4px solid var(--brass);
+  border-radius:8px; padding:14px 16px; margin:0 0 12px 0;
+  font-size:14.5px; line-height:1.6; color:var(--ink);}
+.le-note svg{flex:none; margin-top:2px; color:var(--brass);}
+.le-note strong{color:var(--ink);}
+.le-note-error{border-left-color:var(--danger);}
+.le-note-error svg{color:var(--danger);}
+
+/* Risk band — the four colours are set per-run from the computed score. */
+.le-band{display:flex; gap:18px; align-items:center; background:var(--band-tint,#fff);
+  border:1px solid var(--band-line,var(--line)); border-left:6px solid var(--band,var(--brass));
+  border-radius:var(--radius); padding:18px 22px; margin:0 0 14px 0;}
+.le-band-score{font-family:Georgia,"Times New Roman",serif; font-size:36px; font-weight:700;
+  color:var(--band-ink,var(--ink)); line-height:1; white-space:nowrap;}
+.le-band-score small{font-size:16px; font-weight:400; opacity:.65;}
+.le-band-body{display:flex; flex-direction:column; gap:4px; min-width:0;}
+.le-band-name{font-size:12px; font-weight:700; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--band-ink,var(--ink));}
+.le-band-note{font-size:14.5px; line-height:1.55; color:var(--ink);}
+.le-meter{display:flex; gap:3px; margin-left:auto; flex:none;}
+.le-meter span{width:14px; height:26px; border-radius:2px; background:#ffffff;
+  border:1px solid var(--band-line,var(--line));}
+.le-meter span.on{background:var(--band,var(--brass)); border-color:var(--band,var(--brass));}
+
+/* Severity pills inside the risk table */
+.le-sev{display:inline-block; font-size:11.5px; font-weight:700; letter-spacing:.05em;
+  text-transform:uppercase; padding:3px 9px; border-radius:999px; border:1px solid;
+  white-space:nowrap;}
+.le-sev-critical{color:#8f0000; background:#fdecec; border-color:#e8b4b4;}
+.le-sev-high{color:#9c410a; background:#fdf0e6; border-color:#eec9a8;}
+.le-sev-medium{color:#7d6f00; background:#fbf8e0; border-color:#ddd18f;}
+.le-sev-low{color:#17603c; background:#e9f5ee; border-color:#a8d4bd;}
+
 /* Result card + alerts */
-[data-testid="stVerticalBlockBorderWrapper"]{border-color:var(--line)!important;
+[data-testid="stVerticalBlockBorderWrapper"]{
+  border:1px solid var(--band-line,var(--line))!important;
+  border-top:5px solid var(--band,var(--brass))!important;
   border-radius:var(--radius); background:var(--card);}
-[data-testid="stAlert"]{border-radius:8px;}
+/* Fallback for any Streamlit-generated alert not replaced above. */
+[data-testid="stAlert"]{background:var(--card)!important; border:1px solid var(--line)!important;
+  border-left:4px solid var(--brass)!important; border-radius:8px; box-shadow:none;}
+[data-testid="stAlert"] p, [data-testid="stAlert"] div, [data-testid="stAlert"] li{
+  color:var(--ink)!important;}
 .le-meta{font-size:13px; color:var(--muted);}
 
 /* Steps */
@@ -181,6 +265,84 @@ header[data-testid="stHeader"]{background:#ffffff;}
 SCALES = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v15"/><path d="M7 21h10"/><path d="M12 6l-6 7h12l-6-7z"/><path d="M5 17h14"/></svg>'
 SHIELD = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.6-3 8.1-7 10-4-1.9-7-5.4-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>'
 
+CHECK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
+ALERT = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>'
+
+
+def notice(body: str, icon: str = CHECK, kind: str = "") -> None:
+    """Render a themed notice. Replaces st.success/st.warning/st.error, whose
+    default tinted panels do not sit in this palette and whose text can drop
+    out against them."""
+    css_class = f"le-note {kind}".strip()
+    st.markdown(
+        f'<div class="{css_class}">{icon}<span>{body}</span></div>',
+        unsafe_allow_html=True,
+    )
+
+
+# --------------------------------------------------------------------------
+# Risk bands — strong / tint / ink / line, per band. Every ink-on-tint pair
+# clears 4.5:1 contrast, so the label stays readable at small sizes.
+# --------------------------------------------------------------------------
+BANDS: dict[str, tuple[str, str, str, str, str]] = {
+    "Critical": ("#c00000", "#fdecec", "#8f0000", "#e8b4b4",
+                 "Irreversible loss is likely if you proceed before verifying "
+                 "independently. Treat every deadline in the document as noise."),
+    "High": ("#cc5500", "#fdf0e6", "#9c410a", "#eec9a8",
+             "Material loss or no enforceable remedy. Resolve the flagged items "
+             "before signing or paying."),
+    "Elevated": ("#c98a00", "#fdf6e3", "#8a6000", "#e7d29b",
+                 "Real gaps that could become expensive. Worth a proper read "
+                 "and some negotiation."),
+    "Moderate": ("#b8a200", "#fbf8e0", "#7d6f00", "#ddd18f",
+                 "Ordinary commercial risk with some loose ends. Tidy them up "
+                 "before execution."),
+    "Low": ("#1f7a4d", "#e9f5ee", "#17603c", "#a8d4bd",
+            "Nothing serious surfaced. Skim the findings and proceed."),
+}
+
+_SEVERITY_CELL = re.compile(
+    r"(?<=\|)(\s*)\*{0,2}(Critical|High|Medium|Low)\*{0,2}(\s*)(?=\|)"
+)
+
+
+def colour_severities(markdown: str) -> str:
+    """Turn bare severity words in table cells into coloured pills."""
+
+    def pill(match: re.Match[str]) -> str:
+        word = match.group(2)
+        return (f'{match.group(1)}<span class="le-sev le-sev-{word.lower()}">'
+                f"{word}</span>{match.group(3)}")
+
+    return _SEVERITY_CELL.sub(pill, markdown)
+
+
+def render_risk_band(score: int, band: str) -> None:
+    """Colour the page for this result and draw the rating banner.
+
+    The band colour is published as CSS variables rather than written into each
+    element, so the report card picks it up too and the whole review is framed
+    in one colour.
+    """
+    strong, tint, ink, line, note = BANDS.get(band, BANDS["Moderate"])
+    meter = "".join(
+        f'<span class="{"on" if i < score else ""}"></span>' for i in range(10)
+    )
+    st.markdown(
+        f"""<style>:root{{--band:{strong}; --band-tint:{tint};
+        --band-ink:{ink}; --band-line:{line};}}</style>
+<div class="le-band">
+  <div class="le-band-score">{score}<small>/10</small></div>
+  <div class="le-band-body">
+    <div class="le-band-name">{html.escape(band)} risk</div>
+    <div class="le-band-note">{note}</div>
+  </div>
+  <div class="le-meter">{meter}</div>
+</div>""",
+        unsafe_allow_html=True,
+    )
+
+
 # --------------------------------------------------------------------------
 # Top bar + hero
 # --------------------------------------------------------------------------
@@ -234,24 +396,59 @@ st.markdown(
 <div class="le-panelhead">
   <div>
     <h3>Start a review</h3>
-    <p>Select a document, then run the analysis. Most documents finish in under a minute.</p>
+    <p>Select up to 5 documents, then run the analysis. They are reviewed together as one bundle.</p>
   </div>
-  <span class="le-panelhint">Import your document for analysis →</span>
+  <span class="le-panelhint">Import up to 5 documents for analysis →</span>
 </div>
 """,
     unsafe_allow_html=True,
 )
 
-uploaded_file = st.file_uploader(
-    "Upload a document", type=["pdf", "docx", "txt"]
+uploaded_files = st.file_uploader(
+    "Upload documents (up to 5)",
+    type=["pdf", "docx", "txt"],
+    accept_multiple_files=True,
 )
-run = st.button("Summarize Document", type="primary", disabled=uploaded_file is None)
+
+if uploaded_files and len(uploaded_files) > MAX_FILES:
+    notice(
+        f"You selected {len(uploaded_files)} documents. Only the first "
+        f"{MAX_FILES} are analyzed — remove the extras or run them in a "
+        "second batch afterwards.",
+        icon=ALERT,
+    )
+
+settings_left, settings_right = st.columns(2)
+with settings_left:
+    jurisdiction_label = st.radio(
+        "Jurisdiction",
+        ["South Africa", "General / other"],
+        horizontal=True,
+        help="South Africa applies SA statutes and case law, and restricts "
+             "citations to a curated list this tool can vouch for.",
+    )
+with settings_right:
+    audience_label = st.radio(
+        "Written for",
+        ["Legal professional", "Plain language"],
+        horizontal=True,
+        help="Same analysis either way — only the wording changes.",
+    )
+
+JURISDICTION = "ZA" if jurisdiction_label == "South Africa" else "GENERAL"
+AUDIENCE = "plain" if audience_label == "Plain language" else "professional"
+run = st.button(
+    "Summarize Documents",
+    type="primary",
+    disabled=not uploaded_files,
+)
 
 st.markdown(
     f"""
 <div class="le-privacy">{SHIELD}
-  <span>Your document is read in memory and its temporary file is deleted the moment
-  analysis finishes. Legal-Eye never stores, logs or shares your documents.</span>
+  <span>Your documents are read in memory and their temporary files are deleted
+  the moment analysis finishes. Legal-Eye never stores, logs or shares your
+  documents.</span>
 </div>
 """,
     unsafe_allow_html=True,
@@ -260,52 +457,97 @@ st.markdown(
 # --------------------------------------------------------------------------
 # Results — same pipeline as before, presented in a card.
 # --------------------------------------------------------------------------
-if run and uploaded_file is not None:
-    suffix = Path(uploaded_file.name).suffix or ".txt"
-    temp_path: str | None = None
+if run and uploaded_files:
+    files = list(uploaded_files[:MAX_FILES])
+    temp_paths: list[str] = []
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as handle:
-            handle.write(uploaded_file.getbuffer())
-            temp_path = handle.name
-
-        # The analysis runs in two passes, so report each stage rather than
-        # leaving the reader watching one spinner for the whole wait.
-        with st.status("Analyzing document…", expanded=False) as status:
-            extraction = extract_document(temp_path)
-            text = extraction.text
-            summary = summarize_legal_document(
-                text, on_progress=lambda stage: status.update(label=stage)
+        parts: list[str] = []
+        ocr_names: list[str] = []
+        with st.status("Analyzing documents…", expanded=False) as status:
+            # Bundle the files into one labelled document so the analysis runs
+            # once over everything — cross-document checks (quantities that
+            # must agree across a bundle, attachments vs the covering
+            # document) then see the whole picture.
+            for i, upload in enumerate(files, start=1):
+                status.update(label=f"Reading document {i} of {len(files)}…")
+                suffix = Path(upload.name).suffix or ".txt"
+                with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as handle:
+                    handle.write(upload.getbuffer())
+                    temp_paths.append(handle.name)
+                extraction = extract_document(temp_paths[-1])
+                if extraction.used_ocr:
+                    ocr_names.append(upload.name)
+                parts.append(
+                    f"========== DOCUMENT {i} OF {len(files)}: {upload.name} "
+                    f"==========\n\n{extraction.text}"
+                )
+            text = "\n\n".join(parts)
+            analysis = analyze_legal_document(
+                text,
+                on_progress=lambda stage: status.update(label=stage),
+                jurisdiction=JURISDICTION,
+                audience=AUDIENCE,
             )
+            summary = analysis.summary
             status.update(label="Analysis complete", state="complete")
 
-        st.success(f"Summary ready for **{uploaded_file.name}**")
-        if extraction.used_ocr:
-            st.warning(
-                "This document is a scan, so the text was read using OCR. "
-                "Character recognition can misread names, figures, and dates — "
-                "check anything important against the original."
+        if len(files) == 1:
+            notice(f"Summary ready for <strong>{html.escape(files[0].name)}</strong>")
+        else:
+            names = ", ".join(html.escape(f.name) for f in files)
+            notice(
+                f"Summary ready — <strong>{len(files)} documents analyzed "
+                f"together</strong>: {names}"
             )
-        # The analysis marks its most serious findings with inline colour,
-        # so HTML has to render rather than appear as literal tags.
+        if ocr_names:
+            notice(
+                "These documents are scans, so their text was read using OCR. "
+                "Character recognition can misread names, figures, and dates — "
+                f"check anything important against the original: "
+                f"{', '.join(html.escape(n) for n in ocr_names)}.",
+                icon=ALERT,
+            )
+        if analysis.redaction_summary and "No personal" not in analysis.redaction_summary:
+            notice(
+                f"{html.escape(analysis.redaction_summary)} They were restored "
+                "in the report below, which never leaves this machine.",
+                icon=SHIELD,
+            )
+        if analysis.unverified_citations:
+            notice(
+                f"{len(analysis.unverified_citations)} legal reference(s) in this "
+                "report are <strong>not in the tool's verified list</strong> and may "
+                "be inaccurate. They are listed at the end of the report — check "
+                "each against a primary source before relying on it.",
+                icon=ALERT,
+                kind="le-note-error",
+            )
+
+        render_risk_band(analysis.score, analysis.band)
+
+        # The analysis marks its most serious findings with inline colour, and
+        # colour_severities adds the pills, so HTML has to render rather than
+        # appear as literal tags.
         with st.container(border=True):
-            st.markdown(summary, unsafe_allow_html=True)
+            st.markdown(colour_severities(summary), unsafe_allow_html=True)
 
         st.download_button(
             "Download summary (.md)",
             data=summary,
-            file_name=f"{Path(uploaded_file.name).stem}_summary.md",
+            file_name=f"{Path(files[0].name).stem if len(files) == 1 else 'bundle'}_summary.md",
             mime="text/markdown",
         )
         st.markdown(
-            f'<div class="le-meta">Input: ~{len(text):,} characters analyzed</div>',
+            f'<div class="le-meta">Input: ~{len(text):,} characters analyzed '
+            f"across {len(files)} document{'' if len(files) == 1 else 's'}</div>",
             unsafe_allow_html=True,
         )
 
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
-        st.error(str(exc))
+        notice(html.escape(str(exc)), icon=ALERT, kind="le-note-error")
     finally:
-        if temp_path:
-            Path(temp_path).unlink(missing_ok=True)
+        for path in temp_paths:
+            Path(path).unlink(missing_ok=True)
 
 # --------------------------------------------------------------------------
 # How the review works

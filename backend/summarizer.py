@@ -10,6 +10,7 @@ whether the model happened to do the sum.
 import json
 import re
 import time
+from dataclasses import dataclass
 from collections.abc import Callable
 
 from openai import (
@@ -31,7 +32,9 @@ from backend.config import (
     TEMPERATURE,
     require_api_key,
 )
-from backend.forensics import findings_block, risk_score, run_checks
+from backend.forensics import Finding, findings_block, risk_score, run_checks
+from backend.redaction import Redaction, redact, restore
+from backend.za_law import applicable_statutes, reference_block, unknown_citations
 
 EXTRACTION_MAX_TOKENS = 2_000
 
@@ -274,6 +277,78 @@ RULES
 # Kept so existing imports and tests continue to resolve.
 LEGAL_SYSTEM_PROMPT = ANALYSIS_SYSTEM_PROMPT
 
+ZA_ADDENDUM = """
+
+=== SOUTH AFRICAN JURISDICTION ===
+
+This document is being reviewed for a reader in South Africa. Apply South
+African law: the common law of contract as developed by our courts, and the
+statutes in the reference pack supplied with this request.
+
+CITATION DISCIPLINE — this is the hardest rule in this prompt.
+- Cite ONLY Acts, sections and cases that appear in the supplied reference pack.
+- If the point you want to make needs a provision that is not in the pack, make
+  the point WITHOUT a citation, and say that the specific provision should be
+  confirmed with a legal practitioner.
+- Never invent a section number. Never guess an Act number or year. Never
+  reconstruct a case citation from memory.
+- South African courts have ordered costs de bonis propriis against
+  practitioners and referred them to the Legal Practice Council for filing
+  AI-fabricated authorities. A wrong citation in this report can cost the
+  reader far more than a missing one.
+- Where the pack marks a threshold or commencement date as uncertain, repeat
+  that uncertainty. Do not present it as settled.
+
+ADD THIS SECTION, immediately after Legal & Regulatory Exposure:
+
+## South African Law Notes
+- Only the statutes and doctrines that this document actually engages.
+- Format: **Act or doctrine —** the provision, what it requires, and what in
+  THIS document meets or fails to meet it.
+- Lead with anything going to validity: formalities not met, an agent without
+  written authority, a trustee without letters of authority, an unlicensed
+  practitioner, a term that is void rather than merely unfair.
+- Where a provision makes something VOID rather than voidable or unenforceable,
+  say so explicitly — it changes what the reader can still do.
+- If the document engages no South African statute beyond the general law of
+  contract, write one line saying so. Do not pad.
+
+SOUTH AFRICAN FRAMING
+- Amounts in Rand: R1 234 567.89.
+- This is a Roman-Dutch system. There is no general doctrine of consideration,
+  and per Beadica good faith and ubuntu inform public policy but are not
+  free-standing grounds to refuse enforcement.
+- Do not import English or American concepts the reader cannot use.
+
+REPLACE the disclaimer with this text, verbatim:
+"This review was produced by an automated tool for information only. It is not
+legal advice, does not create an attorney-client relationship, and must not be
+used to prepare documents for court proceedings. AI systems can misstate or
+fabricate legal authorities: every statutory reference, section number and case
+citation above must be independently verified against primary South African
+sources before any reliance is placed on it. Document text is processed by a
+third-party AI provider outside South Africa. Submitting confidential material
+to a third-party system may affect legal professional privilege. Consult an
+admitted South African legal practitioner before acting."
+"""
+
+PLAIN_LANGUAGE_ADDENDUM = """
+
+=== PLAIN LANGUAGE ===
+
+The reader is not a lawyer. Same analysis, same findings, different register.
+- Explain every legal term the first time it appears, in the sentence itself.
+  "voetstoots (sold as-is, so the seller is not answerable for faults)".
+- Say what a provision MEANS FOR THEM before naming it: "the sale may not be
+  valid at all, because of a rule in the Alienation of Land Act", not
+  "s 2(1) non-compliance renders the deed void".
+- Keep the section and Act references — they are what a lawyer will need if the
+  reader takes this further — but never leave one unexplained.
+- Prefer "you" and "the other side". No Latin without a translation. No
+  "notwithstanding", "herein", "the aforesaid".
+- Every recommendation must be an action the reader can actually take this week.
+"""
+
 TRUNCATION_NOTICE = (
     "\n\n[Document truncated to {limit:,} characters to control API cost.]"
 )
@@ -370,11 +445,34 @@ def extract_facts(text: str) -> dict:
     return _parse_json(_chat(EXTRACTION_PROMPT, text, EXTRACTION_MAX_TOKENS, json_mode=True))
 
 
-def summarize_legal_document(
+@dataclass(frozen=True)
+class Analysis:
+    """The finished review, plus the numbers the caller needs to present it."""
+
+    summary: str
+    findings: list[Finding]
+    score: int
+    band: str
+    jurisdiction: str = "GENERAL"
+    unverified_citations: list[str] = None
+    redaction_summary: str = ""
+
+
+# Fallback for the rare run where extraction fails and the model rates the
+# document itself: read the rating back out of its own title.
+_TITLE_RATING = re.compile(
+    r"Risk Rating:\s*(\d{1,2})\s*/\s*10\s*[—\-–]\s*([A-Za-z]+)", re.IGNORECASE
+)
+
+
+def analyze_legal_document(
     text: str,
     on_progress: Callable[[str], None] | None = None,
-) -> str:
-    """Extract, verify, then analyse. Returns the Markdown analysis.
+    jurisdiction: str = "ZA",
+    audience: str = "professional",
+    redact_personal_information: bool = True,
+) -> Analysis:
+    """Extract, verify, then analyse.
 
     If extraction or the deterministic checks fail, the analysis still runs —
     just without verified findings — so a bad pass 1 degrades quality rather
@@ -389,6 +487,16 @@ def summarize_legal_document(
 
     payload = _truncate_text(text)
 
+    # POPIA s 72: pseudonymise identifiers before anything crosses the border.
+    scrub: Redaction = redact(payload) if redact_personal_information else Redaction(payload)
+    payload = scrub.text
+
+    system_prompt = ANALYSIS_SYSTEM_PROMPT
+    if jurisdiction.upper() == "ZA":
+        system_prompt += ZA_ADDENDUM
+    if audience == "plain":
+        system_prompt += PLAIN_LANGUAGE_ADDENDUM
+
     report("Reading the document and extracting facts...")
     try:
         facts = extract_facts(payload)
@@ -402,6 +510,11 @@ def summarize_legal_document(
     score, band = risk_score(findings)
 
     report("Analysing risk...")
+    za_pack = ""
+    if jurisdiction.upper() == "ZA":
+        statutes = applicable_statutes(payload, facts)
+        za_pack = "\n\n" + reference_block(statutes)
+
     if facts:
         context = (
             "DOCUMENT TEXT\n"
@@ -413,15 +526,53 @@ def summarize_legal_document(
             "VERIFIED RISK SCORE\n"
             f"{score}/10 — {band}. Use this figure in the title. It is derived "
             "from the findings above by a fixed rule, so it is defensible; a "
-            "number you choose yourself is not."
+            "number you choose yourself is not." + za_pack
         )
     else:
-        context = payload
+        context = payload + za_pack
 
-    summary = _chat(ANALYSIS_SYSTEM_PROMPT, context, MAX_OUTPUT_TOKENS)
+    summary = _chat(system_prompt, context, MAX_OUTPUT_TOKENS)
     if not summary:
         raise RuntimeError("The AI service returned an empty response.")
-    return summary
+
+    # Restore the real identifiers into the report, which never leaves this machine.
+    summary = restore(summary, scrub.mapping)
+
+    # Police the citations. Anything outside the curated pack is surfaced, not
+    # quietly published — fabricated authority is the one error that can cost
+    # the reader a costs order.
+    unverified: list[str] = []
+    if jurisdiction.upper() == "ZA":
+        unverified = unknown_citations(summary)
+        if unverified:
+            listed = "\n".join(f"- {c}" for c in unverified)
+            summary += (
+                "\n\n---\n\n> **Unverified citations.** The following references "
+                "are not in this tool's curated list of South African authorities "
+                "and may be inaccurate or entirely fabricated. Verify each one "
+                "against a primary source before relying on it:\n"
+                f"{listed}\n"
+            )
+
+    if not findings:
+        match = _TITLE_RATING.search(summary)
+        if match:
+            score = max(1, min(10, int(match.group(1))))
+            band = match.group(2).capitalize()
+
+    return Analysis(summary=summary, findings=findings, score=score, band=band,
+                    jurisdiction=jurisdiction.upper(),
+                    unverified_citations=unverified,
+                    redaction_summary=scrub.summary())
+
+
+def summarize_legal_document(
+    text: str,
+    on_progress: Callable[[str], None] | None = None,
+    **options,
+) -> str:
+    """Return just the Markdown analysis. Kept for callers that want only text."""
+    return analyze_legal_document(text, on_progress=on_progress, **options).summary
 
 
 def estimate_cost(input_chars: int) -> float:

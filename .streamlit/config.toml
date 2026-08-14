@@ -1,0 +1,13 @@
+# Streamlit's own theme. Without this the widget chrome falls back to
+# Streamlit red and a default text colour that washes out on this background —
+# the CSS in streamlit_app.py cannot reach some of it.
+[theme]
+base = "light"
+primaryColor = "#a6782f"              # brass: radio dots, focus rings, sliders
+backgroundColor = "#f5f7fa"           # paper
+secondaryBackgroundColor = "#ffffff"  # cards, inputs
+textColor = "#14283c"                 # ink
+font = "sans serif"
+
+[client]
+toolbarMode = "minimal"

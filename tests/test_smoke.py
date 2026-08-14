@@ -13,6 +13,7 @@ from backend.ocr import ocr_available  # noqa: E402
 from backend.parser import extract_document, extract_text  # noqa: E402
 from backend.summarizer import (  # noqa: E402
     LEGAL_SYSTEM_PROMPT,
+    analyze_legal_document,
     _truncate_text,
     estimate_cost,
     summarize_legal_document,
@@ -179,13 +180,43 @@ def test_full_pipeline_with_mocked_api(sample_dir: Path) -> None:
     fake = _mock_client("# Executive Summary\nA services agreement.")
     with patch.object(summarizer, "_get_client", return_value=fake):
         text = extract_text(str(sample_dir / "agreement.docx"))
-        summary = summarize_legal_document(text)
+        summary = summarize_legal_document(text, jurisdiction="GENERAL")
 
     assert summary.startswith("# Executive Summary")
     sent = fake.chat.completions.create.call_args.kwargs
     assert sent["messages"][0]["content"] == LEGAL_SYSTEM_PROMPT  # byte-identical
     assert sent["temperature"] == 0.2
     assert sent["max_tokens"] == 3_000
+
+
+def test_analysis_returns_a_score_and_band(sample_dir: Path) -> None:
+    """The frontend colours the page from these, so they must always be present."""
+    fake = _mock_client("# Executive Summary\nA services agreement.")
+    with patch.object(summarizer, "_get_client", return_value=fake):
+        result = analyze_legal_document(extract_text(str(sample_dir / "agreement.txt")))
+
+    assert result.summary.startswith("# Executive Summary")
+    assert 1 <= result.score <= 10
+    assert result.band in {"Critical", "High", "Elevated", "Moderate", "Low"}
+    # The mock returns prose, so pass 1 yields no facts and no findings.
+    assert result.findings == []
+    assert (result.score, result.band) == (1, "Low")
+
+
+def test_rating_is_read_back_from_the_title_when_extraction_fails() -> None:
+    """With no verified findings, the model rates the document — honour that."""
+    fake = _mock_client("# Document Risk Rating: 7/10 — High\n\nBody.")
+    with patch.object(summarizer, "_get_client", return_value=fake):
+        result = analyze_legal_document(SAMPLE)
+
+    assert (result.score, result.band) == (7, "High")
+
+
+def test_summarize_still_returns_plain_markdown() -> None:
+    """The old entry point stays a string, for callers that only want the text."""
+    fake = _mock_client("# Executive Summary\nText.")
+    with patch.object(summarizer, "_get_client", return_value=fake):
+        assert summarize_legal_document(SAMPLE) == "# Executive Summary\nText."
 
 
 def test_empty_api_response_raises_runtime_error() -> None:

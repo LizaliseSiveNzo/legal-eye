@@ -7,3 +7,8 @@ venv/
 .streamlit/secrets.toml
 .DS_Store
 *_summary.md
+
+# Local tool artifacts (Kun/DeepSeek scratch output)
+.kun-canvas/
+.deepseekgui-images/
+img/
