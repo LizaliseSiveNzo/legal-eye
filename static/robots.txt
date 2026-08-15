@@ -1,0 +1,16 @@
+# Legal-Eye: AI contract review for South Africa
+User-agent: *
+Allow: /
+
+# AI answer engines and research crawlers are welcome. Discoverability in AI
+# search matters as much as classic SERPs for a tool like this.
+User-agent: GPTBot
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://legal-eye.co.za/sitemap.xml

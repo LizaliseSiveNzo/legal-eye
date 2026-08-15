@@ -53,7 +53,7 @@ class Redaction:
             return "No personal identifiers were detected to redact."
         parts = ", ".join(f"{n} x {k.lower()}" for k, n in sorted(self.counts.items()))
         return (f"{self.total} personal identifier(s) replaced before transmission "
-                f"({parts}). Names are not redacted — see backend/redaction.py.")
+                f"({parts}). Names are not redacted. See backend/redaction.py.")
 
 
 def redact(text: str) -> Redaction:

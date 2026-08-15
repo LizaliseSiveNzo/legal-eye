@@ -12,3 +12,9 @@ venv/
 .kun-canvas/
 .deepseekgui-images/
 img/
+
+# Order database. Contains customer emails and report text.
+orders.db
+orders.db-journal
+*.sqlite3
+static/.DS_Store

@@ -33,6 +33,29 @@ PRICE_INPUT_CACHE_MISS: float = 0.27
 PRICE_INPUT_CACHE_HIT: float = 0.07
 PRICE_OUTPUT: float = 1.10
 
+# Paid delivery. Reports are emailed only after a provider confirms payment.
+REPORT_PRICE_CENTS: int = int(os.getenv("REPORT_PRICE_CENTS", "9900"))
+REPORT_CURRENCY: str = os.getenv("REPORT_CURRENCY", "ZAR").strip()
+
+PAYMENT_PROVIDER: str = os.getenv("PAYMENT_PROVIDER", "dev").strip()
+# Explicit opt-in. Without it the dev provider refuses to run, so a deployment
+# that forgot to configure a gateway fails closed instead of giving work away.
+PAYMENTS_ALLOW_DEV: bool = os.getenv("PAYMENTS_ALLOW_DEV", "").strip().lower() in (
+    "1", "true", "yes")
+
+EMAIL_PROVIDER: str = os.getenv("EMAIL_PROVIDER", "console").strip()
+EMAIL_FROM: str = os.getenv("EMAIL_FROM", "Legal-Eye <reports@legal-eye.co.za>").strip()
+RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "").strip()
+SMTP_HOST: str = os.getenv("SMTP_HOST", "").strip()
+SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USERNAME: str = os.getenv("SMTP_USERNAME", "").strip()
+SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+
+ORDERS_DB_PATH: str = os.getenv("ORDERS_DB_PATH", str(PROJECT_ROOT / "orders.db"))
+# POPIA s 14: report bodies are dropped this many days after delivery. The order
+# record itself is kept, because that is the financial record.
+REPORT_RETENTION_DAYS: int = int(os.getenv("REPORT_RETENTION_DAYS", "30"))
+
 MISSING_KEY_MESSAGE: str = (
     "API key is not set. Copy .env.example to .env and add your API key "
     "(the .env.example file says where to get one)."

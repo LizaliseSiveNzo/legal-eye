@@ -11,3 +11,8 @@ font = "sans serif"
 
 [client]
 toolbarMode = "minimal"
+
+[server]
+# Serves ./static at /app/static/. Note that llms.txt, robots.txt and
+# sitemap.xml must be reachable at the DOMAIN ROOT to be honoured — see SEO.md.
+enableStaticServing = true

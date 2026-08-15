@@ -1,0 +1,69 @@
+# Legal-Eye
+
+> AI contract review for South Africa. Upload a lease, offer to purchase,
+> employment contract, suretyship or commercial agreement and get a risk rating
+> out of 10, the clauses that need attention, and the South African statutes the
+> document actually engages, all in about a minute.
+
+Legal-Eye is built specifically for South African law. It is not a general
+contract tool wearing a South African label. Reviews apply the Consumer Protection
+Act 68 of 2008, the National Credit Act 34 of 2005, the Alienation of Land Act
+68 of 1981, the Electronic Communications and Transactions Act 25 of 2002, the
+Companies Act 71 of 2008, the Rental Housing Act 50 of 1999, POPIA, FICA and
+others, together with the leading South African judgments on contract, including Beadica
+231 CC v Trustees Oregon Trust [2020] ZACC 13, Barkhuizen v Napier [2007] ZACC
+5, and the Shifren principle on non-variation clauses.
+
+## What it does
+
+- Reads PDF, DOCX and TXT, including scanned PDFs via OCR, which matters because most signed
+  South African agreements are scans.
+- Records the document's facts as structured data, then re-derives every number
+  in plain code: does the payment schedule reconcile to the stated total, what
+  is the real unit price, do quantities agree across the bundle.
+- Validates South African identifiers arithmetically: ID numbers by Luhn
+  checksum and encoded date of birth, CIPC registration numbers by format, year
+  and entity-type suffix, SARS VAT and income tax numbers, and Master's Office
+  trust numbers, including whether the Master's Office letter is present. Without
+  it, a trust number is not unique.
+- Applies only the South African statutes the document engages: the Rental
+  Housing Act for a lease, the Alienation of Land Act for a property sale, the
+  National Credit Act for a loan, the Diamonds Act for a minerals deal.
+- Returns a risk rating from 1 to 10 with a band from Low to Critical, derived
+  by a fixed rule from the findings rather than chosen by the model.
+
+## Who it is for
+
+South African businesses, attorneys, conveyancers, paralegals, landlords,
+tenants, property buyers, employers and employees who need to understand a
+contract before signing or paying against it. Reports can be written for a
+legal professional or in plain language.
+
+## Accuracy and citations
+
+South African courts have ordered costs against practitioners personally and
+referred them to the Legal Practice Council for filing AI-fabricated legal
+authorities. The cautionary cases are Mavundla v MEC: COGTA KZN [2025] ZAKZPHC 2 and Northbound
+Processing v SADPMR [2025] ZAGPJHC 661. Legal-Eye therefore may only cite from a
+curated, human-checked list of South African statutes and judgments, and every
+citation in its output is checked against that list in code before the reader
+sees it. Anything outside the list is flagged as unverified rather than
+published as fact.
+
+## Privacy
+
+Documents are read in memory and deleted immediately after analysis. Personal
+identifiers are replaced with placeholders. That covers South African ID
+numbers, email addresses, telephone numbers and account numbers, and they are before any text is sent for
+analysis and restored only in the report shown on screen. Analysis is performed
+by a third-party AI provider outside South Africa, disclosed as required by
+section 18 of the Protection of Personal Information Act 4 of 2013.
+
+## What it is not
+
+Legal-Eye is not a law firm and does not give legal advice. Using it creates no
+attorney-client relationship. Under the Legal Practice Act 28 of 2014, only an
+admitted legal practitioner may appear in court or prepare documents for use in
+legal proceedings. Legal-Eye does neither, and must not be used for court
+papers. It is a triage tool: use it to work out what needs an attorney's
+attention, then consult one.

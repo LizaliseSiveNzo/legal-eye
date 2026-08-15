@@ -272,6 +272,12 @@ RULES
    in one italic line under the title, then complete the sections that apply
    and mark the rest "Not applicable to this document type".
 4. Bold party names, money amounts and dates. No paragraph over four lines.
+4a. HOUSE STYLE. Never use an em dash. Where you would reach for one, use a full
+   stop, a comma, a colon or brackets instead. Vary sentence length: a short
+   sentence after a long one reads like a person wrote it. Avoid the
+   three-item list used for rhythm rather than meaning, avoid "not just X but
+   Y", and avoid opening a sentence with "Importantly" or "Notably". Write the
+   way a careful attorney writes a file note: plain, specific, unhurried.
 5. Output only the structured Markdown. No preamble."""
 
 # Kept so existing imports and tests continue to resolve.
