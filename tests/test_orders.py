@@ -154,10 +154,53 @@ def test_delivery_email_carries_the_disclaimer_and_no_marketing() -> None:
     message = build_message("a@b.co.za", "# Review", ["Lease Agreement.pdf"],
                             9, "Critical", "abc123")
     assert "Critical risk" in message.subject
-    assert message.attachment_name == "Lease_Agreement_review.md"
+    assert message.attachment_name == "Lease_Agreement_review.pdf"
     assert "not legal advice" in message.body_text
     assert "primary South African source" in message.body_text
     assert "once-off delivery and not a subscription" in message.body_text
+
+
+def test_the_attachment_is_a_real_pdf() -> None:
+    message = build_message("a@b.co.za", "# Review\n\nBody.",
+                            ["Lease Agreement.pdf"], 9, "Critical", "abc123")
+    assert message.attachment_type == "application/pdf"
+    assert message.attachment_bytes.startswith(b"%PDF")
+    assert message.attachment_bytes.rstrip().endswith(b"%%EOF")
+
+
+def test_the_html_body_is_branded_and_states_the_risk() -> None:
+    """The covering email has to carry the verdict, not just an attachment."""
+    message = build_message("a@b.co.za", "# Review", ["Lease.pdf"], 9,
+                            "Critical", "abc123")
+    assert "LEGAL-EYE" in message.body_html
+    assert "Critical risk" in message.body_html
+    assert "not legal advice" in message.body_html.lower()
+    # Gmail strips <style> blocks, so every rule that matters must be inline.
+    assert "<style" not in message.body_html.lower()
+    # A remote or data: URI logo would be blocked before it ever rendered.
+    assert "<img" not in message.body_html.lower()
+
+
+def test_filenames_that_would_break_a_mail_header_are_cleaned() -> None:
+    """Quotes and semicolons in a filename corrupt Content-Disposition."""
+    message = build_message("a@b.co.za", "# Review",
+                            ['My "Lease"; v2/final.pdf'], 3, "Moderate", "x1")
+    assert message.attachment_name == "My_Lease_v2_final_review.pdf"
+
+
+def test_an_unrenderable_review_still_reaches_the_reader(monkeypatch) -> None:
+    """A typesetting failure must downgrade to Markdown, never lose the review."""
+    import backend.report_pdf as report_pdf
+
+    def explode(*args, **kwargs):
+        raise RuntimeError("no font for that glyph")
+
+    monkeypatch.setattr(report_pdf, "render_report_pdf", explode)
+    message = build_message("a@b.co.za", "# Review\n\nThe body.",
+                            ["Lease.pdf"], 5, "Elevated", "abc123")
+    assert message.attachment_name.endswith(".md")
+    assert message.attachment_type == "text/markdown"
+    assert b"The body." in message.attachment_bytes
 
 
 def test_marketing_consent_is_recorded_separately(store: SQLiteOrderStore) -> None:

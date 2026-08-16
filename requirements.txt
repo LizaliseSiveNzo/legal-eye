@@ -9,3 +9,9 @@ python-dotenv>=1.0.0
 pymupdf>=1.24.0
 pytesseract>=0.3.10
 pillow>=10.0.0
+
+# Typesetting the emailed review. ReportLab ships as a wheel with no system
+# libraries behind it, which is why it is here instead of WeasyPrint: an
+# HTML-to-PDF engine would need pango and cairo through packages.txt, and a
+# deploy that dies on a missing shared object is worse than writing the layout.
+reportlab>=4.0.0

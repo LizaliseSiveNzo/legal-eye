@@ -295,13 +295,14 @@ def delivery_panel(analysis, document_names: list[str]) -> None:
     delivery, retries and the retention rules behave identically either way.
     """
     if PAYMENTS_ENABLED:
-        blurb = (f"We will send the full review to your address as a file you "
-                 f"can keep, for {_price()}. The copy on this page stays where "
-                 f"it is.")
+        blurb = (f"We will email you the full review as a PDF you can keep, "
+                 f"print and forward, for {_price()}. The copy on this page "
+                 f"stays where it is.")
         button = f"Pay {_price()} and email it to me"
     else:
-        blurb = ("We will send the full review to your address as a file you can "
-                 "keep. It is free while Legal-Eye is in early access.")
+        blurb = ("We will email you the full review as a PDF you can keep, "
+                 "print and forward. It is free while Legal-Eye is in early "
+                 "access.")
         button = "Email the review to me"
 
     st.markdown(

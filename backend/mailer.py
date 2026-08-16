@@ -7,6 +7,8 @@ working with no account and no risk of mailing a real person by accident.
 
 from __future__ import annotations
 
+import logging
+import re
 import smtplib
 import ssl
 from dataclasses import dataclass
@@ -20,11 +22,20 @@ class EmailError(RuntimeError):
 
 @dataclass(frozen=True)
 class Message:
+    """One outbound email: an HTML body, a text fallback, and one attachment.
+
+    The attachment is bytes rather than str because it is now a PDF. Keeping it
+    binary means the same field can carry any future format without another
+    round of changes through every sender.
+    """
+
     to: str
     subject: str
     body_text: str
+    body_html: str
     attachment_name: str
-    attachment_text: str
+    attachment_bytes: bytes
+    attachment_type: str = "application/pdf"
 
 
 class EmailSender(Protocol):
@@ -46,7 +57,7 @@ class ConsoleSender:
         self.sent.append(message)
         print(f"[email] to={message.to} subject={message.subject!r} "
               f"attachment={message.attachment_name} "
-              f"({len(message.attachment_text):,} chars)")
+              f"({len(message.attachment_bytes):,} bytes)")
         return f"console-{len(self.sent)}"
 
 
@@ -116,11 +127,15 @@ class ResendSender:
             "from": self.sender,
             "to": [message.to],
             "subject": message.subject,
+            # Both parts, deliberately. A message with no text/plain alternative
+            # scores worse with spam filters, and some clients refuse HTML.
             "text": message.body_text,
+            "html": message.body_html,
             "attachments": [{
                 "filename": message.attachment_name,
                 "content": base64.b64encode(
-                    message.attachment_text.encode("utf-8")).decode("ascii"),
+                    message.attachment_bytes).decode("ascii"),
+                "content_type": message.attachment_type,
             }],
         }
         request = urllib.request.Request(
@@ -158,8 +173,11 @@ class SMTPSender:
         email["To"] = message.to
         email["Subject"] = message.subject
         email.set_content(message.body_text)
-        email.add_attachment(message.attachment_text.encode("utf-8"),
-                             maintype="text", subtype="markdown",
+        email.add_alternative(message.body_html, subtype="html")
+        maintype, _, subtype = message.attachment_type.partition("/")
+        email.add_attachment(message.attachment_bytes,
+                             maintype=maintype or "application",
+                             subtype=subtype or "octet-stream",
                              filename=message.attachment_name)
         try:
             with smtplib.SMTP(self.host, self.port, timeout=30) as server:
@@ -172,34 +190,69 @@ class SMTPSender:
         return email["Message-ID"] or "smtp"
 
 
+_SAFE_STEM = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def attachment_filename(document_names: list[str]) -> str:
+    """A filename a mail client and a Windows desktop will both accept.
+
+    Anything outside letters, digits, dot, dash and underscore is replaced:
+    quotes and semicolons in a filename break the Content-Disposition header,
+    and colons and slashes are illegal on Windows. The reader's own document
+    name is worth keeping, so it is cleaned rather than discarded.
+    """
+    if not document_names:
+        return "legal-eye-review.pdf"
+    stem = document_names[0].rsplit(".", 1)[0][:60]
+    stem = _SAFE_STEM.sub("_", stem).strip("_")
+    return f"{stem}_review.pdf" if stem else "legal-eye-review.pdf"
+
+
 def build_message(to: str, report: str, document_names: list[str],
                   risk_score: int | None, risk_band: str | None,
                   order_reference: str) -> Message:
-    """Compose the delivery email. Plain and factual, no marketing."""
+    """Compose the delivery email: branded HTML, text fallback, PDF attached.
+
+    The PDF is rendered here rather than upstream so that every path to a
+    delivery produces the same document. A retry from the order store has no
+    access to the Streamlit session, only to the stored Markdown, so the Markdown
+    has to remain the single source the attachment is built from.
+    """
+    from backend.email_template import build_html, build_text
+    from backend.report_pdf import render_report_pdf
+
     documents = ", ".join(document_names) if document_names else "your document"
-    rating = (f"Risk rating: {risk_score} out of 10 ({risk_band}).\n"
-              if risk_score is not None else "")
     subject = f"Your Legal-Eye review of {documents}"
     if risk_band:
         subject = f"Your Legal-Eye review ({risk_band} risk): {documents}"
 
-    body = (
-        f"Your review of {documents} is attached.\n\n"
-        f"{rating}"
-        "\nThis review was produced by an automated tool for information only. "
-        "It is not legal advice, it creates no attorney and client relationship, "
-        "and it must not be used to prepare documents for court proceedings. AI "
-        "systems can misstate or invent legal authorities, so verify every "
-        "statutory reference and case citation against a primary South African "
-        "source before relying on it. Consult an admitted South African legal "
-        "practitioner before acting.\n\n"
-        f"Order reference: {order_reference}\n"
-        "\nYou are receiving this because you asked for this report to be "
-        "emailed to you. It is a once-off delivery and not a subscription.\n"
+    filename = attachment_filename(document_names)
+    content_type = "application/pdf"
+    try:
+        attachment = render_report_pdf(report, document_names, risk_score,
+                                       risk_band, order_reference)
+    except Exception as exc:  # noqa: BLE001 - deliberate catch-all, see below
+        # Typesetting must never cost the reader their review. This path touches
+        # fonts, table layout and whatever Markdown the model happened to
+        # produce, so it has more ways to fail than the rest of delivery put
+        # together. Falling back to the Markdown means the reader still gets a
+        # readable review; raising here would mean they get nothing.
+        logging.getLogger(__name__).warning(
+            "PDF rendering failed for order %s, falling back to Markdown: %s",
+            order_reference, exc,
+        )
+        filename = filename.removesuffix(".pdf") + ".md"
+        attachment = report.encode("utf-8")
+        content_type = "text/markdown"
+
+    return Message(
+        to=to,
+        subject=subject,
+        body_text=build_text(document_names, risk_score, risk_band,
+                             order_reference, filename),
+        body_html=build_html(document_names, risk_score, risk_band,
+                             order_reference, filename),
+        attachment_name=filename,
+        attachment_bytes=attachment,
+        attachment_type=content_type,
     )
-    filename = "legal-eye-review.md"
-    if document_names:
-        stem = document_names[0].rsplit(".", 1)[0][:60].replace(" ", "_")
-        filename = f"{stem}_review.md"
-    return Message(to=to, subject=subject, body_text=body,
-                   attachment_name=filename, attachment_text=report)
