@@ -5,12 +5,12 @@
   "redirects": [
     {
       "source": "/app",
-      "destination": "https://REPLACE-ME.streamlit.app",
+      "destination": "https://legal-eye-emyps83mxjnardvoa4yjts.streamlit.app/",
       "permanent": false
     },
     {
       "source": "/app/:path*",
-      "destination": "https://REPLACE-ME.streamlit.app/:path*",
+      "destination": "https://legal-eye-emyps83mxjnardvoa4yjts.streamlit.app/:path*",
       "permanent": false
     }
   ],
