@@ -1,0 +1,35 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/app",
+      "destination": "https://REPLACE-ME.streamlit.app",
+      "permanent": false
+    },
+    {
+      "source": "/app/:path*",
+      "destination": "https://REPLACE-ME.streamlit.app/:path*",
+      "permanent": false
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Strict-Transport-Security",
+          "value": "max-age=31536000; includeSubDomains" },
+        { "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()" }
+      ]
+    },
+    {
+      "source": "/(llms.txt|robots.txt|sitemap.xml)",
+      "headers": [ { "key": "Cache-Control", "value": "public, max-age=3600" } ]
+    }
+  ]
+}

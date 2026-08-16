@@ -33,7 +33,8 @@ def store(tmp_path: Path) -> SQLiteOrderStore:
 @pytest.fixture
 def order(store: SQLiteOrderStore):
     return create_order(store, "buyer@example.co.za", "# Review\nBody.",
-                        ["lease.pdf"], 9900, risk_score=7, risk_band="High")
+                        ["lease.pdf"], 9900, risk_score=7, risk_band="High",
+                        immediate_delivery_consent=True)
 
 
 @pytest.mark.parametrize("address, ok", [
@@ -166,3 +167,41 @@ def test_marketing_consent_is_recorded_separately(store: SQLiteOrderStore) -> No
                          marketing_opt_in=True)
     assert plain.marketing_opt_in is False
     assert store.get(opted.id).marketing_opt_in is True
+
+
+# --- ECTA s 42(2)(d) consent ----------------------------------------------
+
+def test_delivery_refused_without_consent_to_immediate_delivery(
+    store: SQLiteOrderStore
+) -> None:
+    """The terms say consent is recorded before delivery. Enforce it in code.
+
+    ECTA s 48 makes any clause excluding a Chapter VII right void, so the
+    seven-day cooling-off right in s 44 falls away only where s 42(2)(d) is
+    actually satisfied: the service began with the consumer's consent. No
+    consent, no delivery.
+    """
+    order = create_order(store, "a@b.co.za", "R", ["x.pdf"], 9900)
+    assert order.immediate_delivery_consent is False
+    assert order.consent_at is None
+
+    with pytest.raises(OrderError, match="consent to immediate delivery"):
+        fulfil_order(store, order, get_provider("dev", allow_dev=True),
+                     ConsoleSender())
+
+
+def test_consent_is_timestamped_and_persisted(store: SQLiteOrderStore) -> None:
+    order = create_order(store, "a@b.co.za", "R", ["x.pdf"], 9900,
+                         immediate_delivery_consent=True)
+    assert order.consent_at is not None
+    reloaded = store.get(order.id)
+    assert reloaded.immediate_delivery_consent is True
+    assert reloaded.consent_at == order.consent_at
+
+
+def test_consent_and_marketing_are_independent(store: SQLiteOrderStore) -> None:
+    """Consenting to delivery is not consenting to marketing (POPIA s 69)."""
+    order = create_order(store, "a@b.co.za", "R", ["x.pdf"], 9900,
+                         immediate_delivery_consent=True)
+    assert order.immediate_delivery_consent is True
+    assert order.marketing_opt_in is False

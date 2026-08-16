@@ -38,6 +38,14 @@ def fulfil_order(
             raise
         order = mark_paid(store, order.id, provider.name, reference)
 
+    if not order.immediate_delivery_consent:
+        raise OrderError(
+            "This order has no record of consent to immediate delivery. Under "
+            "ECTA s 42(2)(d) the seven-day cooling-off right falls away only "
+            "where the service began with the consumer's consent, so that "
+            "consent must be given and recorded before the review is sent."
+        )
+
     if not order.is_deliverable():
         raise OrderError(
             "This order has no report attached, so there is nothing to send. "

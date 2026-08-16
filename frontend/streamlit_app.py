@@ -352,6 +352,13 @@ def delivery_panel(analysis, document_names: list[str]) -> None:
 
     with st.form("deliver_report"):
         email = st.text_input("Email address", placeholder="you@company.co.za")
+        consent = st.checkbox(
+            "Send my review immediately. I understand that because delivery "
+            "starts straight away, the seven-day cooling-off right in section 44 "
+            "of the Electronic Communications and Transactions Act falls away "
+            "under section 42(2)(d).",
+            value=False,
+        )
         marketing = st.checkbox(
             "Occasionally email me about Legal-Eye. Unticked means we only use "
             "your address to send this one review.",
@@ -364,7 +371,9 @@ def delivery_panel(analysis, document_names: list[str]) -> None:
         f'<div class="le-uploadhint">Your address is used to deliver this review '
         f"and to keep the order record. It is not shared, and it is not added to "
         f"any mailing list unless you tick the box above. Reports are removed "
-        f"from our records after the retention period.</div>",
+        f"from our records after the retention period. See our "
+        f"<a href='https://legal-eye.co.za/terms'>terms</a> and "
+        f"<a href='https://legal-eye.co.za/privacy'>privacy notice</a>.</div>",
         unsafe_allow_html=True,
     )
 
@@ -374,6 +383,15 @@ def delivery_panel(analysis, document_names: list[str]) -> None:
     if not valid_email(email):
         notice("That does not look like an email address. Please check it and try "
                "again.", icon=ALERT, kind="le-note-error")
+        return
+
+    if not consent:
+        notice("Please tick the box confirming you want the review sent "
+               "immediately. We need that confirmation on record before we can "
+               "deliver, and you can read why in our "
+               "<a href='https://legal-eye.co.za/terms'>terms</a>. If you would rather keep the "
+               "seven-day cooling-off right, contact us and we will hold the "
+               "order instead.", icon=ALERT, kind="le-note-error")
         return
 
     try:
@@ -387,6 +405,7 @@ def delivery_panel(analysis, document_names: list[str]) -> None:
             risk_band=analysis.band,
             marketing_opt_in=marketing,
             currency=REPORT_CURRENCY,
+            immediate_delivery_consent=consent,
         )
         with st.spinner("Confirming payment and sending your review..."):
             delivered = fulfil_order(

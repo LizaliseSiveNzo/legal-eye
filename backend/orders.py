@@ -66,6 +66,12 @@ class Order:
     provider: str | None = None
     provider_reference: str | None = None
     marketing_opt_in: bool = False
+    # ECTA s 42(2)(d): the seven-day cooling-off right in s 44 does not apply to
+    # a service that began with the consumer's consent before the seven days had
+    # passed. That consent has to be real, separate and recorded, otherwise it
+    # reads as an attempt to exclude a Chapter VII right, which s 48 makes void.
+    immediate_delivery_consent: bool = False
+    consent_at: str | None = None
     created_at: str = field(default_factory=_now)
     paid_at: str | None = None
     delivered_at: str | None = None
@@ -116,6 +122,8 @@ class SQLiteOrderStore:
                     provider TEXT,
                     provider_reference TEXT,
                     marketing_opt_in INTEGER NOT NULL DEFAULT 0,
+                    immediate_delivery_consent INTEGER NOT NULL DEFAULT 0,
+                    consent_at TEXT,
                     created_at TEXT NOT NULL,
                     paid_at TEXT,
                     delivered_at TEXT,
@@ -124,11 +132,22 @@ class SQLiteOrderStore:
             """)
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS orders_status ON orders(status)")
+            # Databases created before consent was recorded need the columns added.
+            existing = {row["name"] for row in
+                        connection.execute("PRAGMA table_info(orders)")}
+            for column, definition in (
+                ("immediate_delivery_consent", "INTEGER NOT NULL DEFAULT 0"),
+                ("consent_at", "TEXT"),
+            ):
+                if column not in existing:
+                    connection.execute(
+                        f"ALTER TABLE orders ADD COLUMN {column} {definition}")
 
     def save(self, order: Order) -> None:
         data = asdict(order)
         data["document_names"] = json.dumps(order.document_names)
         data["marketing_opt_in"] = int(order.marketing_opt_in)
+        data["immediate_delivery_consent"] = int(order.immediate_delivery_consent)
         columns = ", ".join(data)
         placeholders = ", ".join(f":{k}" for k in data)
         with self._connect() as connection:
@@ -146,6 +165,7 @@ class SQLiteOrderStore:
         data = dict(row)
         data["document_names"] = json.loads(data["document_names"])
         data["marketing_opt_in"] = bool(data["marketing_opt_in"])
+        data["immediate_delivery_consent"] = bool(data["immediate_delivery_consent"])
         return Order(**data)
 
     def purge_delivered_reports(self, older_than_days: int = 30) -> int:
@@ -180,6 +200,7 @@ def create_order(
     risk_band: str | None = None,
     marketing_opt_in: bool = False,
     currency: str = "ZAR",
+    immediate_delivery_consent: bool = False,
 ) -> Order:
     """Record a pending order. Nothing is charged and nothing is sent yet."""
     address = (email or "").strip().lower()
@@ -200,6 +221,8 @@ def create_order(
         risk_band=risk_band,
         report=report,
         marketing_opt_in=bool(marketing_opt_in),
+        immediate_delivery_consent=bool(immediate_delivery_consent),
+        consent_at=_now() if immediate_delivery_consent else None,
     )
     store.save(order)
     return order

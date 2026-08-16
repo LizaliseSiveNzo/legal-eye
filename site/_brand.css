@@ -1,0 +1,77 @@
+:root{
+  --ink:#14283c; --ink-soft:#23394f; --slate:#44536a; --muted:#67748a;
+  --paper:#f5f7fa; --card:#fff; --line:#dfe5ec; --line-strong:#b9c4d1;
+  --brass:#a6782f; --brass-ink:#8a6427; --brass-tint:#f4ead9;
+  --ok:#1f7a4d; --danger:#c00000; --radius:10px;
+}
+*{box-sizing:border-box;}
+body{margin:0; background:var(--paper); color:var(--slate); line-height:1.65;
+  font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  font-size:16px;}
+.wrap{max-width:1000px; margin:0 auto; padding:0 22px;}
+.narrow{max-width:760px;}
+h1,h2,h3,h4{color:var(--ink); line-height:1.25;}
+h1{font-family:Georgia,"Times New Roman",serif; font-size:clamp(32px,4.6vw,46px);
+  letter-spacing:-.01em; margin:0 0 18px;}
+h2{font-family:Georgia,serif; font-size:26px; margin:44px 0 12px;}
+h3{font-size:18px; margin:28px 0 8px;}
+a{color:var(--brass-ink);}
+a:hover{color:var(--brass);}
+header.bar{background:#fff; border-bottom:1px solid var(--line);}
+header.bar .wrap{display:flex; align-items:center; justify-content:space-between;
+  padding-top:14px; padding-bottom:14px;}
+.brand{display:flex; align-items:center; gap:10px; text-decoration:none;}
+.brand svg{color:var(--brass);}
+.brand span{font-weight:700; letter-spacing:.06em; color:var(--ink); font-size:17px;}
+.navnote{font-size:12.5px; color:var(--muted); border:1px solid var(--line);
+  padding:6px 12px; border-radius:999px;}
+.eyebrow{font-size:12px; font-weight:700; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--brass-ink); margin:0 0 14px;}
+.lead{font-size:17px; color:var(--slate); max-width:640px;}
+.btn{display:inline-block; background:#fff; color:var(--brass-ink);
+  border:1px solid var(--brass); border-radius:8px; font-weight:600;
+  padding:.7rem 1.7rem; text-decoration:none; transition:background .15s;}
+.btn:hover{background:var(--brass-tint); border-color:var(--brass-ink); color:var(--brass-ink);}
+.btn-solid{background:var(--ink); color:#fff; border-color:var(--ink);}
+.btn-solid:hover{background:var(--ink-soft); color:#fff; border-color:var(--ink-soft);}
+.chips{display:flex; flex-wrap:wrap; gap:10px; margin:22px 0 0; padding:0; list-style:none;}
+.chips li{font-size:13px; background:#fff; border:1px solid var(--line);
+  border-radius:999px; padding:7px 14px;}
+.grid{display:grid; gap:14px;}
+.g2{grid-template-columns:1fr 1fr;}
+.g3{grid-template-columns:repeat(3,1fr);}
+.g4{grid-template-columns:repeat(4,1fr);}
+.card{background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:20px;}
+.card.top{border-top:3px solid var(--brass);}
+.card h3,.card h4{margin:0 0 6px;}
+.card p{margin:0; font-size:14px; color:var(--muted);}
+.stat{font-size:26px; font-weight:700; color:var(--ink); line-height:1.1;}
+.dark{background:var(--ink); border-radius:var(--radius); padding:30px 32px; color:#c7d2dd;}
+.dark h2,.dark h3{color:#fff; margin-top:0;}
+.dark a{color:#e4cfa5;}
+footer{background:var(--ink); color:#c7d2dd; margin-top:56px; padding:34px 0;}
+footer a{color:#e4cfa5;}
+footer p{font-size:12.5px; max-width:900px;}
+.footline{color:#8fa2b4; font-size:12px; border-top:1px solid #2e465c;
+  padding-top:14px; margin-top:16px;}
+table{border-collapse:collapse; width:100%; font-size:14.5px; margin:14px 0;}
+th,td{text-align:left; padding:10px 12px; border-bottom:1px solid var(--line);
+  vertical-align:top;}
+th{background:#fff; color:var(--ink); font-size:12px; letter-spacing:.08em;
+  text-transform:uppercase;}
+td:first-child{color:var(--ink); white-space:nowrap;}
+.legal{background:#fff; border:1px solid var(--line); border-radius:var(--radius);
+  padding:26px 30px; margin:22px 0;}
+.legal ol{padding-left:20px;}
+.legal li{margin:8px 0;}
+.callout{background:#fff; border:1px solid var(--line); border-left:4px solid var(--brass);
+  border-radius:8px; padding:16px 18px; margin:18px 0; color:var(--ink); font-size:15px;}
+.callout.warn{border-left-color:var(--danger);}
+.updated{font-size:13px; color:var(--muted);}
+details{background:#fff; border:1px solid var(--line); border-radius:8px;
+  padding:14px 18px; margin-bottom:10px;}
+summary{font-weight:600; color:var(--ink); cursor:pointer;}
+details p{margin:10px 0 0; font-size:15px;}
+.fill{background:var(--brass-tint); border-bottom:1px dashed var(--brass);
+  padding:0 3px; font-weight:600; color:var(--brass-ink);}
+@media(max-width:860px){.g2,.g3,.g4{grid-template-columns:1fr;} .navnote{display:none;}}

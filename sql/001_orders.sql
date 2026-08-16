@@ -17,6 +17,9 @@ create table if not exists orders (
     provider           text,
     provider_reference text,
     marketing_opt_in   boolean     not null default false,
+    -- ECTA s 42(2)(d): consent to immediate delivery, separately recorded.
+    immediate_delivery_consent boolean not null default false,
+    consent_at         timestamptz,
     created_at         timestamptz not null default now(),
     paid_at            timestamptz,
     delivered_at       timestamptz,
