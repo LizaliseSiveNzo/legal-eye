@@ -50,6 +50,38 @@ class ConsoleSender:
         return f"console-{len(self.sent)}"
 
 
+def _describe(status: int, body: str) -> str:
+    """Turn a rejected HTTP response into one readable sentence.
+
+    Raw bodies were being pasted into the page untouched, so a Cloudflare block
+    page arrived as "error code: 1010" run together with the sentence after it.
+    Worth the few lines: this text is the only thing anyone sees when a delivery
+    fails, and the whole cost of a vague error is an evening spent guessing.
+    """
+    import json as _json
+    import re as _re
+
+    text = _re.sub(r"<[^>]+>", " ", body)
+    text = _re.sub(r"\s+", " ", text).strip()
+
+    if "1010" in text and "error code" in text.lower():
+        return ("The request was blocked by Resend's firewall before it reached "
+                "their API, which usually means the sending code is missing a "
+                "User-Agent header.")
+
+    try:
+        parsed = _json.loads(body)
+    except ValueError:
+        parsed = None
+    if isinstance(parsed, dict):
+        text = str(parsed.get("message") or parsed.get("error") or text).strip()
+
+    text = text[:300].rstrip()
+    if text and not text.endswith((".", "!", "?")):
+        text += "."
+    return f"Resend rejected the message ({status}): {text or 'no detail given.'}"
+
+
 class ResendSender:
     """Transactional email through Resend.
 
@@ -60,6 +92,13 @@ class ResendSender:
 
     name = "resend"
     endpoint = "https://api.resend.com/emails"
+
+    # Resend sits behind Cloudflare, which screens callers by client signature.
+    # urllib's default "Python-urllib/3.x" is on the blocked list, so the send
+    # never reached Resend at all: Cloudflare answered 403 with "error code:
+    # 1010" and the account's own API log stayed empty, which read as though the
+    # app had never called out. An honest, specific User-Agent clears it.
+    user_agent = "legal-eye/1.0 (+https://legal-eye.co.za)"
 
     def __init__(self, api_key: str, sender: str) -> None:
         if not api_key:
@@ -88,17 +127,19 @@ class ResendSender:
             self.endpoint,
             data=json.dumps(payload).encode("utf-8"),
             headers={"Authorization": f"Bearer {self.api_key}",
-                     "Content-Type": "application/json"},
+                     "Content-Type": "application/json",
+                     "Accept": "application/json",
+                     "User-Agent": self.user_agent},
             method="POST",
         )
         try:
             with urllib.request.urlopen(request, timeout=30) as response:
                 return json.loads(response.read().decode("utf-8")).get("id", "")
         except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", "replace")[:300]
-            raise EmailError(f"Resend rejected the message ({exc.code}): {detail}") from exc
+            raise EmailError(_describe(exc.code,
+                                       exc.read().decode("utf-8", "replace"))) from exc
         except urllib.error.URLError as exc:
-            raise EmailError(f"Could not reach Resend: {exc.reason}") from exc
+            raise EmailError(f"Could not reach Resend: {exc.reason}.") from exc
 
 
 class SMTPSender:
