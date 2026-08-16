@@ -103,7 +103,9 @@ def test_short_text_is_not_truncated() -> None:
 
 
 def test_cost_estimate_is_small_and_positive() -> None:
-    assert 0 < estimate_cost(len(SAMPLE)) < 0.01
+    # Ceiling, not expectation: it assumes the full output budget plus a
+    # continuation, which almost no review actually uses.
+    assert 0 < estimate_cost(len(SAMPLE)) < 0.05
     assert estimate_cost(50_000) < 0.05
     assert estimate_cost(500_000) == estimate_cost(50_000)  # capped by truncation
 
@@ -164,15 +166,33 @@ def test_non_contract_documents_are_handled() -> None:
     assert "Not applicable to this document type" in LEGAL_SYSTEM_PROMPT
 
 
-def _mock_client(content: str) -> MagicMock:
+def _mock_client(content: str, finish_reason: str = "stop") -> MagicMock:
     client = MagicMock()
     message = MagicMock()
     message.content = content
     choice = MagicMock()
     choice.message = message
+    choice.finish_reason = finish_reason
     response = MagicMock()
     response.choices = [choice]
     client.chat.completions.create.return_value = response
+    return client
+
+
+def _mock_client_sequence(*turns: tuple[str, str]) -> MagicMock:
+    """A client that answers each call with the next (content, finish_reason)."""
+    client = MagicMock()
+    responses = []
+    for content, finish_reason in turns:
+        message = MagicMock()
+        message.content = content
+        choice = MagicMock()
+        choice.message = message
+        choice.finish_reason = finish_reason
+        response = MagicMock()
+        response.choices = [choice]
+        responses.append(response)
+    client.chat.completions.create.side_effect = responses
     return client
 
 
@@ -186,7 +206,7 @@ def test_full_pipeline_with_mocked_api(sample_dir: Path) -> None:
     sent = fake.chat.completions.create.call_args.kwargs
     assert sent["messages"][0]["content"] == LEGAL_SYSTEM_PROMPT  # byte-identical
     assert sent["temperature"] == 0.2
-    assert sent["max_tokens"] == 3_000
+    assert sent["max_tokens"] == 8_000
 
 
 def test_analysis_returns_a_score_and_band(sample_dir: Path) -> None:
@@ -345,3 +365,50 @@ def test_extract_text_still_returns_a_plain_string(sample_dir: Path) -> None:
     text = extract_text(str(sample_dir / "agreement.txt"))
     assert isinstance(text, str)
     assert "Acme Corp" in text
+
+
+# --- truncation ------------------------------------------------------------
+
+def test_a_review_cut_off_by_the_token_limit_is_continued() -> None:
+    """The model stopping on "length" used to end the review mid-sentence."""
+    fake = _mock_client_sequence(
+        ("{}", "stop"),  # pass 1: fact extraction
+        ("# Executive Summary\nThe letter requires payment", "length"),
+        (" immediately after verification.\n\n## Recommendations\nDo not pay.", "stop"),
+    )
+    with patch.object(summarizer, "_get_client", return_value=fake):
+        summary = summarize_legal_document(SAMPLE, jurisdiction="GENERAL")
+
+    assert "payment immediately after verification." in summary
+    assert summary.rstrip().endswith("Do not pay.")
+    assert "incomplete" not in summary.lower()
+    assert fake.chat.completions.create.call_count == 3  # extract, analyse, continue
+
+
+def test_the_continuation_does_not_resend_the_whole_prompt() -> None:
+    """The second call must carry the partial answer, or the model restarts."""
+    fake = _mock_client_sequence(
+        ("{}", "stop"),  # pass 1: fact extraction
+        ("# Executive Summary\nPart one", "length"),
+        (" and part two.", "stop"),
+    )
+    with patch.object(summarizer, "_get_client", return_value=fake):
+        summarize_legal_document(SAMPLE, jurisdiction="GENERAL")
+
+    second = fake.chat.completions.create.call_args_list[2].kwargs["messages"]
+    assert second[-2]["role"] == "assistant"
+    assert second[-2]["content"] == "# Executive Summary\nPart one"
+    assert "Carry on from exactly where you stopped" in second[-1]["content"]
+
+
+def test_a_review_that_never_finishes_says_so() -> None:
+    """Silence is the worst outcome: the reader cannot tell what is missing."""
+    fake = _mock_client("# Executive Summary\nOn and on", finish_reason="length")
+    with patch.object(summarizer, "_get_client", return_value=fake):
+        summary = summarize_legal_document(SAMPLE, jurisdiction="GENERAL")
+
+    assert "This review is incomplete." in summary
+    assert "Split the bundle" in summary
+    # Fact extraction, then one analysis pass plus MAX_CONTINUATIONS attempts.
+    assert (fake.chat.completions.create.call_count
+            == summarizer.MAX_CONTINUATIONS + 2)

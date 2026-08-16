@@ -14,7 +14,14 @@ DEEPSEEK_BASE_URL: str = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.co
 DEEPSEEK_MODEL: str = os.getenv("DEEPSEEK_MODEL", "deepseek-chat").strip()
 
 MAX_INPUT_CHARS: int = 50_000
-MAX_OUTPUT_TOKENS: int = 3_000
+# 3,000 was cutting long reviews off mid-sentence, with no error and no sign in
+# the output that anything was missing. deepseek-chat accepts up to 8,192
+# output tokens, and the analysis continues itself when even that runs out.
+MAX_OUTPUT_TOKENS: int = 8_000
+# How many times the analysis may ask the model to carry on from where it
+# stopped. Three is generous: a review that needs a fourth is not being
+# truncated, it is running away.
+MAX_CONTINUATIONS: int = 3
 TEMPERATURE: float = 0.2
 
 # OCR settings for scanned PDFs. 300 DPI is the accuracy/speed sweet spot for

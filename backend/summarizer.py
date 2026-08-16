@@ -25,6 +25,7 @@ from backend.config import (
     DEEPSEEK_BASE_URL,
     DEEPSEEK_MODEL,
     MAX_INPUT_CHARS,
+    MAX_CONTINUATIONS,
     MAX_OUTPUT_TOKENS,
     PRICE_INPUT_CACHE_MISS,
     PRICE_OUTPUT,
@@ -382,8 +383,31 @@ def _truncate_text(text: str, max_chars: int = MAX_INPUT_CHARS) -> str:
     return clipped.rstrip() + TRUNCATION_NOTICE.format(limit=max_chars)
 
 
-def _chat(system: str, user: str, max_tokens: int, json_mode: bool = False) -> str:
-    """One chat completion, retrying on rate limits and mapping errors to plain English."""
+CONTINUE_INSTRUCTION = (
+    "You stopped mid-way because you ran out of output space. Carry on from "
+    "exactly where you stopped, even if that is mid-sentence or mid-word. Do "
+    "not repeat anything you have already written, do not restate the last "
+    "heading, and do not summarise what came before. Just continue, and finish "
+    "the remaining sections."
+)
+
+TRUNCATED_NOTICE = (
+    "\n\n---\n\n<span style=\"color:#c00000\">**This review is incomplete.**</span> "
+    "The document was long enough that the analysis ran out of room even after "
+    "continuing. Everything above is complete, but sections after this point "
+    "are missing. Split the bundle into smaller documents and run them "
+    "separately to get the rest."
+)
+
+
+def _completion(messages: list[dict], max_tokens: int,
+                json_mode: bool = False) -> tuple[str, str]:
+    """One chat completion. Returns the text and why the model stopped.
+
+    The finish reason used to be discarded, which is how a review could end
+    mid-sentence with nothing anywhere reporting a problem: "length" looks
+    exactly like "stop" once you throw it away.
+    """
     client = _get_client()
     kwargs = {"response_format": {"type": "json_object"}} if json_mode else {}
 
@@ -392,10 +416,7 @@ def _chat(system: str, user: str, max_tokens: int, json_mode: bool = False) -> s
         try:
             response = client.chat.completions.create(
                 model=DEEPSEEK_MODEL,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
+                messages=messages,
                 temperature=TEMPERATURE,
                 max_tokens=max_tokens,
                 **kwargs,
@@ -427,7 +448,52 @@ def _chat(system: str, user: str, max_tokens: int, json_mode: bool = False) -> s
 
     if not response.choices:
         raise RuntimeError("The AI service returned an empty response.")
-    return (response.choices[0].message.content or "").strip()
+    choice = response.choices[0]
+    # Not stripped: a continuation may legitimately begin with a space, and
+    # stripping it would fuse the last word of one part to the first of the next.
+    return (choice.message.content or ""), (choice.finish_reason or "stop")
+
+
+def _chat(system: str, user: str, max_tokens: int, json_mode: bool = False) -> str:
+    """One completion, as plain text. Used where truncation is not a concern."""
+    content, _ = _completion(
+        [{"role": "system", "content": system},
+         {"role": "user", "content": user}],
+        max_tokens, json_mode,
+    )
+    return content.strip()
+
+
+def _chat_until_complete(system: str, user: str, max_tokens: int,
+                         on_progress: Callable[[str], None] | None = None,
+                         ) -> tuple[str, bool]:
+    """Run the analysis, continuing it if the model runs out of output space.
+
+    Raising the token ceiling alone does not fix this. A long bundle can exhaust
+    any ceiling, and the failure is silent and ugly: the review simply stops in
+    the middle of a sentence, under a heading that promised more. So the model
+    is asked to carry on, up to MAX_CONTINUATIONS times, and if it still has not
+    finished the reader is told outright rather than left to notice.
+
+    Returns the text and whether it actually finished.
+    """
+    messages = [{"role": "system", "content": system},
+                {"role": "user", "content": user}]
+    parts: list[str] = []
+
+    for attempt in range(MAX_CONTINUATIONS + 1):
+        if attempt and on_progress is not None:
+            on_progress(f"Continuing the review (part {attempt + 1})...")
+        content, finish_reason = _completion(messages, max_tokens)
+        parts.append(content)
+        if finish_reason != "length":
+            return "".join(parts).strip(), True
+        messages = messages + [
+            {"role": "assistant", "content": content},
+            {"role": "user", "content": CONTINUE_INSTRUCTION},
+        ]
+
+    return "".join(parts).strip(), False
 
 
 def _parse_json(raw: str) -> dict:
@@ -541,7 +607,10 @@ def analyze_legal_document(
     else:
         context = payload + za_pack
 
-    summary = _chat(system_prompt, context, MAX_OUTPUT_TOKENS)
+    summary, complete = _chat_until_complete(system_prompt, context,
+                                             MAX_OUTPUT_TOKENS, on_progress)
+    if not complete:
+        summary += TRUNCATED_NOTICE
     if not summary:
         raise RuntimeError("The AI service returned an empty response.")
 
@@ -597,7 +666,10 @@ def estimate_cost(input_chars: int) -> float:
     analysis_in = (billed_chars * 2 + len(ANALYSIS_SYSTEM_PROMPT)) / 4
     input_cost = (extraction_in + analysis_in) / 1_000_000 * PRICE_INPUT_CACHE_MISS
 
-    output_tokens = EXTRACTION_MAX_TOKENS + MAX_OUTPUT_TOKENS
+    # Assume one continuation on average: most reviews finish in one pass,
+    # long bundles take two, so quoting the single-pass figure would
+    # understate the cost of exactly the documents people care most about.
+    output_tokens = EXTRACTION_MAX_TOKENS + int(MAX_OUTPUT_TOKENS * 1.5)
     output_cost = output_tokens / 1_000_000 * PRICE_OUTPUT
 
     return round(input_cost + output_cost, 4)
