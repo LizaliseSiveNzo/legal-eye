@@ -29,10 +29,11 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-VERIFIED_ON = "2026-08-14"
+VERIFIED_ON = "2026-08-16"
+PACK_VERSION = "2.0"
 
 
-def _trigger_pattern(triggers: tuple[str, ...]) -> re.Pattern[str]:
+def trigger_pattern(triggers: tuple[str, ...]) -> re.Pattern[str]:
     """Whole-word matcher for a statute's trigger list."""
     alternatives = "|".join(re.escape(t) for t in sorted(triggers, key=len, reverse=True))
     # The alternation MUST be grouped: without (?:...) the lookbehind binds only
@@ -52,7 +53,7 @@ class Statute:
     caveat: str = ""
 
     def matches(self, haystack: str) -> bool:
-        return _trigger_pattern(self.triggers).search(haystack) is not None
+        return trigger_pattern(self.triggers).search(haystack) is not None
 
 
 @dataclass(frozen=True)
@@ -461,6 +462,126 @@ AUTHORITIES: tuple[Authority, ...] = (
               "Regulator", "[2025] ZAGPJHC 661",
               "Those using AI have a professional duty to check the accuracy of "
               "what it produces. Conduct referred to the LPC."),
+    Authority("Cape Explosive Works Ltd v South African Oil and Fat Industries Ltd",
+              "1921 CPD 244",
+              "The expedition (posting) theory for postal contracts: acceptance is "
+              "complete when posted, so the contract arises then, not on receipt."),
+    Authority("Bloom v American Swiss Watch Co", "1915 AD 100",
+              "An offer of reward may be revoked by a notice published as widely as "
+              "the offer itself, effective against persons who have not yet accepted."),
+    Authority("Pieters & Co v Salomon", "1911 AD 121",
+              "Quasi-mutual assent: where one party's conduct reasonably induces the "
+              "other to believe in consent, the first is held to that appearance."),
+    Authority("Sonap Petroleum (SA) (Pty) Ltd v Pappadogianis", "1992 (3) SA 234 (A)",
+              "For mistake to avoid a contract it must be both material and reasonable "
+              "(iustus error). A signatory who could have read the terms and did not "
+              "rarely succeeds."),
+    Authority("National and Overseas Distributors Corporation (Pty) Ltd v Potato Board",
+              "1958 (2) SA 473 (A)",
+              "Error in corpore — a mistake about the very subject matter of the "
+              "contract — precludes true agreement and no contract arises."),
+    Authority("Bayer South Africa (Pty) Ltd v Frost", "1991 (4) SA 559 (A)",
+              "Fraudulent pre-contract misrepresentation grounds rescission and "
+              "delictual damages; negligent misstatement may also sound in delict "
+              "for pure economic loss."),
+    Authority("Arend and Another v Astra Furnishers (Pty) Ltd", "1974 (1) SA 298 (C)",
+              "Duress vitiates consent: a threat that is unlawful, imminent and "
+              "operative on the mind of the contracting party makes the contract "
+              "voidable, with restitution available."),
+    Authority("Preller and Others v Jordaan", "1956 (1) SA 483 (A)",
+              "Undue influence: where one party held influence over the other and "
+              "used it to procure an unconscionable bargain, the transaction is "
+              "voidable; the onus shifts once influence and the outcome are shown."),
+    Authority("NBS Boland Bank Ltd v One Berg River Drive CC", "1999 (4) SA 928 (SCA)",
+              "An 'agreement to agree' is void for vagueness unless it contains a "
+              "workable deadlock-breaking mechanism. Terms must be definite or "
+              "objectively determinable."),
+    Authority("Sasfin (Pty) Ltd v Beukes", "1989 (1) SA 1 (A)",
+              "An agreement contrary to public policy is unenforceable. Security terms "
+              "that deprive a debtor of the means to earn are not saved by severance "
+              "when they undermine the agreement's substance."),
+    Authority("Peters, Flamman and Co v Kokstad Municipality", "1919 AD 427",
+              "Supervening impossibility of performance without the debtor's fault "
+              "extinguishes the obligation. Performance must be objectively impossible, "
+              "not merely more difficult or more expensive."),
+    Authority("KPMG Chartered Accountants (SA) v Securefin Ltd", "2009 (4) SA 399 (SCA)",
+              "Interpretation admits the context known to the parties, including the "
+              "nature and purpose of the contract — but evidence cannot contradict "
+              "clear terms."),
+    Authority("Bothma-Batho Transport (Edms) Bpk v S Bothma & Seun Transport "
+              "(Edms) Bpk", "2014 (2) SA 494 (SCA)",
+              "The words the parties used are the starting point: interpretation "
+              "stays anchored in the language read in context, not in what a party "
+              "wishes it had said."),
+    Authority("Capitec Bank Holdings Ltd v Coral Lagoon Investments 194 (Pty) Ltd",
+              "[2021] ZASCA 99; 2022 (1) SA 100 (SCA)",
+              "Interpretation is not mechanical; the aim is the contract's objective "
+              "meaning, but a court may not strain the words to avoid commercial "
+              "consequences the parties themselves chose."),
+    Authority("BK Tooling (Edms) Bpk v Scope Precision Engineering (Edms) Bpk",
+              "1979 (1) SA 391 (A)",
+              "Mora: where no time is fixed the debtor must be placed in mora by "
+              "demand (mora ex persona); where a time is fixed the debtor is "
+              "automatically in mora (mora ex re). Time is of the essence only "
+              "where the contract says so clearly."),
+    Authority("Scoin Trading (Pty) Ltd v Bernstein NO", "2011 (2) SA 118 (SCA)",
+              "A date for performance is essential only where the contract makes it "
+              "so, expressly or by necessary implication; the general position "
+              "favours interpretation that keeps the contract alive."),
+    Authority("Holmdene Brickworks (Pty) Ltd v Roberts Construction Co Ltd",
+              "1977 (3) SA 670 (A)",
+              "Measure of damages for defective performance: the reasonable cost of "
+              "remedying the defect, or the difference between the value as performed "
+              "and as warranted, whichever the circumstances indicate."),
+    Authority("Datacolor International (Pty) Ltd v Intamarket (Pty) Ltd",
+              "2001 (1) SA 581 (SCA)",
+              "Repudiation requires conduct that unequivocally shows an intention not "
+              "to be bound. The innocent party must elect — cancel, or hold the "
+              "contract open — and the election must be plain."),
+    Authority("Baker v Probert", "1985 (3) SA 429 (A)",
+              "Cancellation of a contract obliges both parties to restore what they "
+              "received; a party who rescinds cannot retain the benefits of the "
+              "bargain while undoing its burdens."),
+    Authority("Shatz Investments (Pty) Ltd v Kalovyrnas", "1976 (2) SA 545 (A)",
+              "Interest as damages: interest on an unpaid sum is recoverable as "
+              "damages where the debtor's breach caused the loss of use of the money."),
+    Authority("Novartis SA (Pty) Ltd v Maphil Trading (Pty) Ltd",
+              "[2015] ZASCA 111; 2016 (1) SA 518 (SCA)",
+              "Damages after cancellation are measured by the difference between the "
+              "contract price and the value of the performance actually rendered — "
+              "the injured party is placed in the position it would have occupied "
+              "had the contract been performed."),
+    Authority("Thoroughbred Breeders' Association v Price Waterhouse",
+              "2001 (4) SA 551 (SCA)",
+              "Contractual damages aim at positive interesse: putting the innocent "
+              "party in the position it would have been in had the contract been "
+              "performed, not merely reversing its expenses."),
+    Authority("Benson v SA Mutual Life Assurance Society", "1986 (1) SA 776 (A)",
+              "Specific performance is a substantive right, but the court has a "
+              "discretion to refuse it where the order would operate unduly harshly "
+              "on the defendant."),
+    Authority("ISEP Structural Engineering and Plating (Pty) Ltd v Inland "
+              "Exploration Co (Pty) Ltd", "1981 (4) SA 1 (A)",
+              "Specific performance is not a discretionary remedy in the narrow sense: "
+              "a plaintiff is entitled to it as of right unless the defendant shows "
+              "grounds for refusal. Adequacy of damages is not in itself such a ground."),
+    Authority("Paiges v Van Ryn Gold Mines Estates Ltd", "1920 AD 600",
+              "A pactum de non cedendo binds the parties but does not prevent the "
+              "right from passing: a cession in breach of it is still effective, and "
+              "the cedent answers in damages."),
+    Authority("Magna Alloys and Research (SA) (Pty) Ltd v Ellis",
+              "1984 (4) SA 874 (A)",
+              "Restraints of trade are prima facie valid and enforceable. The onus is "
+              "on the party alleging unreasonableness — not on the party enforcing."),
+    Authority("Basson v Chilwan and Others", "1993 (3) SA 742 (A)",
+              "Reasonableness of a restraint asks: is there a protectable interest, is "
+              "the restraint's area and period reasonable, does it offend public "
+              "policy, and does it go further than needed."),
+    Authority("Mutual and Federal Insurance Co Ltd v Oudtshoorn Municipality",
+              "1985 (1) SA 419 (A)",
+              "Insurance contracts are uberrimae fidei: utmost good faith. Material "
+              "non-disclosure or misrepresentation entitles the insurer to avoid the "
+              "policy, regardless of the proposer's innocence."),
 )
 
 
@@ -483,13 +604,22 @@ def applicable_statutes(text: str, facts: dict | None = None) -> list[Statute]:
     return selected
 
 
-def reference_block(statutes: list[Statute], include_authorities: bool = True) -> str:
-    """Render the selected law for injection into the analysis prompt."""
+def reference_block(
+    statutes: list[Statute],
+    authorities: list[Authority] | None = None,
+    include_authorities: bool = True,
+) -> str:
+    """Render the selected law for injection into the analysis prompt.
+
+    `authorities` selects the leading cases to include; when omitted, the full
+    pack is rendered (the historical behaviour).
+    """
     parts = [
         "SOUTH AFRICAN LAW REFERENCE PACK",
-        f"Curated and verified on {VERIFIED_ON}. You may cite ONLY what appears "
-        "below. Do not cite any other Act, section or case, and do not paraphrase "
-        "a provision into a section number that is not listed here.",
+        f"Curated and verified on {VERIFIED_ON} (pack {PACK_VERSION}). You may "
+        "cite ONLY what appears below. Do not cite any other Act, section or "
+        "case, and do not paraphrase a provision into a section number that is "
+        "not listed here.",
         "",
     ]
     for statute in statutes:
@@ -502,12 +632,18 @@ def reference_block(statutes: list[Statute], include_authorities: bool = True) -
         parts.append("")
 
     if include_authorities:
+        chosen = AUTHORITIES if authorities is None else authorities
         parts.append("### Leading authorities")
-        for authority in AUTHORITIES:
+        for authority in chosen:
             parts.append(f"  - {authority.name} {authority.citation} — "
                          f"{authority.proposition}")
         parts.append("")
     return "\n".join(parts)
+
+
+def authority_by_citation() -> dict[str, Authority]:
+    """Map each authority's primary citation to the Authority object."""
+    return {a.citation.split(";")[0].strip(): a for a in AUTHORITIES}
 
 
 # ---------------------------------------------------------------------------
@@ -518,6 +654,23 @@ _ACT_RE = re.compile(r"\b([A-Z][A-Za-z'()\-]*(?:\s+(?:of|and|in|the|for|to|"
                      r"[A-Z][A-Za-z'()\-]*)){0,9}?\s+Act)\s+(\d+)\s+of\s+(\d{4})")
 _CASE_RE = re.compile(r"\[(\d{4})\]\s+(ZACC|ZASCA|ZAGPJHC|ZAGPPHC|ZAKZPHC|ZAWCHC|"
                       r"ZALCJHB|ZAECGHC|ZAFSHC|ZANWHC|ZALMPPHC|ZAMPMHC|ZANCHC)\s+(\d+)")
+# Pre-2003 SA reports style: 1979 (1) SA 391 (A), 1999 (4) SA 928 (SCA), plus the
+# BCLR/SACR reporters, the old Appellate Division and provincial divisions.
+# Without these the whitelist simply cannot see the citation format most SA
+# judgments use, and fabricated ones slip through unverified.
+_SA_CASE_RE = re.compile(
+    r"\b(\d{4})\s*\(\s*(\d{1,2})\s*\)\s*(SA|BCLR|SACR|ALL\s+SA)\s+(\d+)"
+    r"\s*\(\s*([A-Z]{1,4})\s*\)"
+)
+_AD_CASE_RE = re.compile(r"\b(\d{4})\s+AD\s+(\d+)")
+_PROV_CASE_RE = re.compile(
+    r"\b(\d{4})\s+(CPD|EDL|GWL|NPD|OPD|EPD|TPD|WLD|SWA|NC)\s+(\d+)"
+)
+
+
+def _norm(citation: str) -> str:
+    """A citation's identity, ignoring brackets, case and spacing."""
+    return re.sub(r"\s+", "", citation.lower()).replace("[", "").replace("]", "")
 
 
 def _known_acts() -> set[tuple[str, str]]:
@@ -529,7 +682,12 @@ def _known_acts() -> set[tuple[str, str]]:
 
 
 def _known_cases() -> set[str]:
-    return {a.citation.split(";")[0].strip() for a in AUTHORITIES}
+    """Every citable form of every authority, normalised."""
+    known = set()
+    for authority in AUTHORITIES:
+        for part in authority.citation.split(";"):
+            known.add(_norm(part.strip()))
+    return known
 
 
 def unknown_citations(markdown: str) -> list[str]:
@@ -551,7 +709,22 @@ def unknown_citations(markdown: str) -> list[str]:
 
     for year, court, number in _CASE_RE.findall(markdown or ""):
         citation = f"[{year}] {court} {number}"
-        if not any(citation in known for known in known_cases) and citation not in unknown:
+        if _norm(citation) not in known_cases and citation not in unknown:
+            unknown.append(citation)
+
+    for year, volume, reporter, page, court in _SA_CASE_RE.findall(markdown or ""):
+        citation = f"{year} ({volume}) {reporter} {page} ({court})"
+        if _norm(citation) not in known_cases and citation not in unknown:
+            unknown.append(citation)
+
+    for year, page in _AD_CASE_RE.findall(markdown or ""):
+        citation = f"{year} AD {page}"
+        if _norm(citation) not in known_cases and citation not in unknown:
+            unknown.append(citation)
+
+    for year, division, page in _PROV_CASE_RE.findall(markdown or ""):
+        citation = f"{year} {division} {page}"
+        if _norm(citation) not in known_cases and citation not in unknown:
             unknown.append(citation)
 
     return unknown

@@ -35,6 +35,7 @@ from backend.config import (
 from backend.forensics import Finding, findings_block, risk_score, run_checks
 from backend.redaction import Redaction, redact, restore
 from backend.za_law import applicable_statutes, reference_block, unknown_citations
+from backend.sa_doctrines import applicable_doctrines, doctrine_block, select_authorities
 
 EXTRACTION_MAX_TOKENS = 2_000
 
@@ -519,7 +520,10 @@ def analyze_legal_document(
     za_pack = ""
     if jurisdiction.upper() == "ZA":
         statutes = applicable_statutes(payload, facts)
-        za_pack = "\n\n" + reference_block(statutes)
+        doctrines = applicable_doctrines(payload, facts)
+        authorities = select_authorities(doctrines)
+        za_pack = "\n\n" + reference_block(statutes, authorities=authorities)
+        za_pack += "\n" + doctrine_block(doctrines)
 
     if facts:
         context = (
