@@ -32,10 +32,10 @@ from backend.config import (
     TEMPERATURE,
     require_api_key,
 )
-from backend import languages
 from backend.forensics import Finding, findings_block, risk_score, run_checks
 from backend.redaction import Redaction, redact, restore
 from backend.za_law import applicable_statutes, reference_block, unknown_citations
+from backend.sa_doctrines import applicable_doctrines, doctrine_block, select_authorities
 
 EXTRACTION_MAX_TOKENS = 2_000
 
@@ -463,9 +463,6 @@ class Analysis:
     jurisdiction: str = "GENERAL"
     unverified_citations: list[str] = None
     redaction_summary: str = ""
-    # Carried on the Analysis so the PDF and the covering email render in the
-    # same language as the review, rather than each guessing separately.
-    language: str = "en"
 
 
 # Fallback for the rare run where extraction fails and the model rates the
@@ -481,7 +478,6 @@ def analyze_legal_document(
     jurisdiction: str = "ZA",
     audience: str = "professional",
     redact_personal_information: bool = True,
-    language: str = "en",
 ) -> Analysis:
     """Extract, verify, then analyse.
 
@@ -507,11 +503,6 @@ def analyze_legal_document(
         system_prompt += ZA_ADDENDUM
     if audience == "plain":
         system_prompt += PLAIN_LANGUAGE_ADDENDUM
-    # Language goes on last so it is the final instruction the model reads, and
-    # so it governs the plain-language rewriting rather than fighting it.
-    chosen_language = languages.get(language)
-    if not chosen_language.is_english:
-        system_prompt += chosen_language.prompt
 
     report("Reading the document and extracting facts...")
     try:
@@ -529,7 +520,10 @@ def analyze_legal_document(
     za_pack = ""
     if jurisdiction.upper() == "ZA":
         statutes = applicable_statutes(payload, facts)
-        za_pack = "\n\n" + reference_block(statutes)
+        doctrines = applicable_doctrines(payload, facts)
+        authorities = select_authorities(doctrines)
+        za_pack = "\n\n" + reference_block(statutes, authorities=authorities)
+        za_pack += "\n" + doctrine_block(doctrines)
 
     if facts:
         context = (
@@ -579,8 +573,7 @@ def analyze_legal_document(
     return Analysis(summary=summary, findings=findings, score=score, band=band,
                     jurisdiction=jurisdiction.upper(),
                     unverified_citations=unverified,
-                    redaction_summary=scrub.summary(),
-                    language=chosen_language.code)
+                    redaction_summary=scrub.summary())
 
 
 def summarize_legal_document(

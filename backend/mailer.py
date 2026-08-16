@@ -210,7 +210,7 @@ def attachment_filename(document_names: list[str]) -> str:
 
 def build_message(to: str, report: str, document_names: list[str],
                   risk_score: int | None, risk_band: str | None,
-                  order_reference: str, language: str = "en") -> Message:
+                  order_reference: str) -> Message:
     """Compose the delivery email: branded HTML, text fallback, PDF attached.
 
     The PDF is rendered here rather than upstream so that every path to a
@@ -218,25 +218,19 @@ def build_message(to: str, report: str, document_names: list[str],
     access to the Streamlit session, only to the stored Markdown, so the Markdown
     has to remain the single source the attachment is built from.
     """
-    from backend import languages
     from backend.email_template import build_html, build_text
     from backend.report_pdf import render_report_pdf
 
-    lang = languages.get(language)
     documents = ", ".join(document_names) if document_names else "your document"
-    subject = lang.strings["subject"].format(documents=documents)
+    subject = f"Your Legal-Eye review of {documents}"
     if risk_band:
-        band_label = lang.bands.get(risk_band.strip().title(),
-                                    (risk_band, ""))[0]
-        subject = lang.strings["subject_banded"].format(
-            band=band_label, documents=documents)
+        subject = f"Your Legal-Eye review ({risk_band} risk): {documents}"
 
     filename = attachment_filename(document_names)
     content_type = "application/pdf"
     try:
         attachment = render_report_pdf(report, document_names, risk_score,
-                                       risk_band, order_reference,
-                                       language=lang.code)
+                                       risk_band, order_reference)
     except Exception as exc:  # noqa: BLE001 - deliberate catch-all, see below
         # Typesetting must never cost the reader their review. This path touches
         # fonts, table layout and whatever Markdown the model happened to
@@ -255,9 +249,9 @@ def build_message(to: str, report: str, document_names: list[str],
         to=to,
         subject=subject,
         body_text=build_text(document_names, risk_score, risk_band,
-                             order_reference, filename, lang.code),
+                             order_reference, filename),
         body_html=build_html(document_names, risk_score, risk_band,
-                             order_reference, filename, lang.code),
+                             order_reference, filename),
         attachment_name=filename,
         attachment_bytes=attachment,
         attachment_type=content_type,

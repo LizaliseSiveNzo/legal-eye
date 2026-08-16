@@ -68,7 +68,6 @@ def fulfil_order(
         risk_score=order.risk_score,
         risk_band=order.risk_band,
         order_reference=order.id[:12],
-        language=order.language,
     )
     try:
         sender.send(message)

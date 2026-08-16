@@ -34,7 +34,6 @@ from backend.config import (  # noqa: E402
 )
 from backend.delivery import fulfil_order  # noqa: E402
 from backend.mailer import ConsoleSender, EmailError, ResendSender  # noqa: E402
-from backend import languages  # noqa: E402
 from backend.orders import create_order, get_order_store  # noqa: E402
 from backend.orders import OrderError, OrderStore, valid_email  # noqa: E402
 from backend.payments import PaymentError, get_provider  # noqa: E402
@@ -391,7 +390,6 @@ def delivery_panel(analysis, document_names: list[str]) -> None:
             marketing_opt_in=marketing,
             currency=REPORT_CURRENCY,
             immediate_delivery_consent=consent,
-            language=getattr(analysis, "language", "en"),
         )
         spinner = ("Confirming payment and sending your review..."
                    if PAYMENTS_ENABLED else "Sending your review...")
@@ -572,17 +570,6 @@ with settings_right:
         help="Same analysis either way. Only the wording changes.",
     )
 
-LANGUAGE_CHOICES = languages.choices()
-language_label = st.radio(
-    "Language",
-    [native for _, native in LANGUAGE_CHOICES],
-    horizontal=True,
-    help="Act names, section numbers and case citations always stay in English, "
-         "whichever language you choose. The English version is authoritative.",
-)
-LANGUAGE = next(code for code, native in LANGUAGE_CHOICES
-                if native == language_label)
-
 JURISDICTION = "ZA" if jurisdiction_label == "South Africa" else "GENERAL"
 AUDIENCE = "plain" if audience_label == "Plain language" else "professional"
 run = st.button(
@@ -639,7 +626,6 @@ if run and uploaded_files:
                 on_progress=lambda stage: status.update(label=stage),
                 jurisdiction=JURISDICTION,
                 audience=AUDIENCE,
-                language=LANGUAGE,
             )
             status.update(label="Analysis complete", state="complete")
 
