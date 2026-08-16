@@ -617,65 +617,95 @@ if run and uploaded_files:
                 jurisdiction=JURISDICTION,
                 audience=AUDIENCE,
             )
-            summary = analysis.summary
             status.update(label="Analysis complete", state="complete")
 
-        if len(files) == 1:
-            notice(f"Summary ready for <strong>{html.escape(files[0].name)}</strong>")
-        else:
-            names = ", ".join(html.escape(f.name) for f in files)
-            notice(
-                f"Summary ready for <strong>{len(files)} documents, analyzed "
-                f"together</strong>: {names}"
-            )
-        if ocr_names:
-            notice(
-                "These documents are scans, so their text was read using OCR. "
-                "Character recognition can misread names, figures and dates, so "
-                f"check anything important against the original: "
-                f"{', '.join(html.escape(n) for n in ocr_names)}.",
-                icon=ALERT,
-            )
-        if analysis.redaction_summary and "No personal" not in analysis.redaction_summary:
-            notice(
-                f"{html.escape(analysis.redaction_summary)} They are restored in "
-                "the report below, which never leaves this machine.",
-                icon=SHIELD,
-            )
-        if analysis.unverified_citations:
-            notice(
-                f"{len(analysis.unverified_citations)} legal reference(s) in this "
-                "report are <strong>not in the tool's verified list</strong> and may "
-                "be inaccurate. They are listed at the end of the report. Check each "
-                "one against a primary source before you rely on it.",
-                icon=ALERT,
-                kind="le-note-error",
-            )
-
-        render_risk_band(analysis.score, analysis.band)
-
-        # The analysis marks its most serious findings with inline colour, and
-        # colour_severities adds the pills, so HTML has to render rather than
-        # appear as literal tags.
-        with st.container(border=True):
-            st.markdown(escape_currency(colour_severities(summary)),
-                        unsafe_allow_html=True)
-
-        # The free download is replaced by paid delivery. The review itself
-        # stays on screen; what is sold is the copy you can keep and forward.
-        delivery_panel(analysis, [f.name for f in files])
-
-        st.markdown(
-            f'<div class="le-meta">Input: ~{len(text):,} characters analyzed '
-            f"across {len(files)} document{'' if len(files) == 1 else 's'}</div>",
-            unsafe_allow_html=True,
-        )
+        # Park the finished review in session state instead of rendering it
+        # straight from these local variables.
+        #
+        # Streamlit reruns this file from the top on every interaction, and a
+        # button reports True only on the single rerun that follows its click.
+        # So the moment the reader submitted the email form, the script reran
+        # with run = False, this whole block was skipped, the review disappeared
+        # off the page and the send was never reached. Nothing errored, nothing
+        # was logged, and no request ever left the server. Session state
+        # survives reruns, which is what makes the form usable at all.
+        st.session_state["review"] = {
+            "analysis": analysis,
+            "document_names": [f.name for f in files],
+            "ocr_names": ocr_names,
+            "characters": len(text),
+        }
 
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
+        st.session_state.pop("review", None)
         notice(html.escape(str(exc)), icon=ALERT, kind="le-note-error")
     finally:
         for path in temp_paths:
             Path(path).unlink(missing_ok=True)
+
+
+# --------------------------------------------------------------------------
+# Rendered from session state, not from the run above, so the review stays on
+# screen across the reruns that the email field, the checkboxes and the submit
+# button all trigger.
+# --------------------------------------------------------------------------
+review = st.session_state.get("review")
+if review:
+    analysis = review["analysis"]
+    document_names = review["document_names"]
+    ocr_names = review["ocr_names"]
+
+    if len(document_names) == 1:
+        notice(f"Summary ready for <strong>{html.escape(document_names[0])}</strong>")
+    else:
+        names = ", ".join(html.escape(n) for n in document_names)
+        notice(
+            f"Summary ready for <strong>{len(document_names)} documents, analyzed "
+            f"together</strong>: {names}"
+        )
+    if ocr_names:
+        notice(
+            "These documents are scans, so their text was read using OCR. "
+            "Character recognition can misread names, figures and dates, so "
+            f"check anything important against the original: "
+            f"{', '.join(html.escape(n) for n in ocr_names)}.",
+            icon=ALERT,
+        )
+    if analysis.redaction_summary and "No personal" not in analysis.redaction_summary:
+        notice(
+            f"{html.escape(analysis.redaction_summary)} They are restored in "
+            "the report below, which never leaves this machine.",
+            icon=SHIELD,
+        )
+    if analysis.unverified_citations:
+        notice(
+            f"{len(analysis.unverified_citations)} legal reference(s) in this "
+            "report are <strong>not in the tool's verified list</strong> and may "
+            "be inaccurate. They are listed at the end of the report. Check each "
+            "one against a primary source before you rely on it.",
+            icon=ALERT,
+            kind="le-note-error",
+        )
+
+    render_risk_band(analysis.score, analysis.band)
+
+    # The analysis marks its most serious findings with inline colour, and
+    # colour_severities adds the pills, so HTML has to render rather than
+    # appear as literal tags.
+    with st.container(border=True):
+        st.markdown(escape_currency(colour_severities(analysis.summary)),
+                    unsafe_allow_html=True)
+
+    # The review itself stays on screen. What delivery adds is a copy the
+    # reader can keep and forward.
+    delivery_panel(analysis, document_names)
+
+    st.markdown(
+        f'<div class="le-meta">Input: ~{review["characters"]:,} characters '
+        f'analyzed across {len(document_names)} '
+        f"document{'' if len(document_names) == 1 else 's'}</div>",
+        unsafe_allow_html=True,
+    )
 
 # --------------------------------------------------------------------------
 # Footer. Deliberately short: the landing page carries the explanatory content,
