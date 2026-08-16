@@ -37,6 +37,13 @@ PRICE_OUTPUT: float = 1.10
 REPORT_PRICE_CENTS: int = int(os.getenv("REPORT_PRICE_CENTS", "9900"))
 REPORT_CURRENCY: str = os.getenv("REPORT_CURRENCY", "ZAR").strip()
 
+# Master switch for charging. While this is false the review is emailed free of
+# charge: no payment step, no price shown, and the ECTA cooling-off machinery
+# stays dormant because there is no sale to which it could apply. Turning it on
+# is a config change, not a code change.
+PAYMENTS_ENABLED: bool = os.getenv("PAYMENTS_ENABLED", "").strip().lower() in (
+    "1", "true", "yes")
+
 PAYMENT_PROVIDER: str = os.getenv("PAYMENT_PROVIDER", "dev").strip()
 # Explicit opt-in. Without it the dev provider refuses to run, so a deployment
 # that forgot to configure a gateway fails closed instead of giving work away.

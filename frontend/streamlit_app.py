@@ -25,6 +25,7 @@ from backend.config import (  # noqa: E402
     ORDERS_DB_PATH,
     PAYMENT_PROVIDER,
     PAYMENTS_ALLOW_DEV,
+    PAYMENTS_ENABLED,
     REPORT_CURRENCY,
     REPORT_PRICE_CENTS,
     RESEND_API_KEY,
@@ -34,7 +35,6 @@ from backend.mailer import ConsoleSender, EmailError, ResendSender  # noqa: E402
 from backend.orders import SQLiteOrderStore, create_order  # noqa: E402
 from backend.orders import OrderError, valid_email  # noqa: E402
 from backend.payments import PaymentError, get_provider  # noqa: E402
-from backend.summarizer import analyze_legal_document  # noqa: E402
 
 MAX_FILES = 5  # hard cap: the bundle is reviewed as one combined document
 
@@ -61,14 +61,11 @@ st.markdown(
 .stApp, .stApp button, .stApp input, .stApp textarea{
   font-family:"Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
 }
-.block-container{max-width:1080px; padding-top:2.4rem; padding-bottom:4rem;}
-
+.block-container{max-width:1180px; padding-top:2.4rem; padding-bottom:4rem;}
 /* Chrome hygiene */
 #MainMenu, footer, [data-testid="stToolbar"]{visibility:hidden;}
 [data-testid="stDecoration"]{display:none;}
-
 h1,h2,h3,h4{color:var(--ink);}
-
 /* Top bar — white, with the logo centred. Streamlit's own header is fixed to
    the viewport and would float over the page on scroll, so it is removed
    outright rather than recoloured. */
@@ -82,7 +79,6 @@ header[data-testid="stHeader"]{display:none;}
 .le-topnote{position:absolute; right:20px; top:50%; transform:translateY(-50%);
   font-size:12.5px; color:var(--muted); border:1px solid var(--line);
   padding:6px 12px; border-radius:999px;}
-
 /* Hero */
 .le-hero{max-width:820px; margin:0 0 28px 0;}
 .le-eyebrow{font-size:12px; font-weight:700; letter-spacing:.16em;
@@ -91,23 +87,6 @@ header[data-testid="stHeader"]{display:none;}
   font-weight:700; font-size:clamp(34px,4.6vw,48px); line-height:1.12;
   letter-spacing:-.01em; color:var(--ink); margin:0 0 18px 0;}
 .le-sub{font-size:16.5px; line-height:1.65; color:var(--slate); max-width:640px; margin:0 0 22px 0;}
-.le-chips{display:flex; flex-wrap:wrap; gap:10px;}
-.le-chip{font-size:13px; color:var(--slate); background:var(--card);
-  border:1px solid var(--line); border-radius:999px; padding:7px 14px;}
-
-/* Stats */
-.le-stats{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin:0 0 36px 0;}
-.le-stat{background:var(--card); border:1px solid var(--line); border-top:3px solid var(--brass);
-  border-radius:var(--radius); padding:18px 20px;}
-.le-stat-value{font-size:26px; font-weight:700; color:var(--ink); line-height:1.1;}
-.le-stat-label{font-size:12.5px; line-height:1.5; color:var(--muted); margin-top:6px;}
-
-/* Section headings */
-.le-section{margin:44px 0 18px 0;}
-.le-section h2{font-family:Georgia, "Iowan Old Style", "Times New Roman", serif;
-  font-size:25px; font-weight:700; margin:0 0 8px 0;}
-.le-section p{margin:0; font-size:15px; color:var(--muted); max-width:660px;}
-
 /* Upload panel */
 .le-panelhead{display:flex; justify-content:space-between; align-items:flex-end;
   gap:16px; margin:0 0 10px 0;}
@@ -121,7 +100,6 @@ header[data-testid="stHeader"]{display:none;}
 .le-privacy{display:flex; gap:10px; align-items:flex-start; font-size:13.5px;
   line-height:1.55; color:var(--muted); margin-top:14px;}
 .le-privacy svg{flex:none; color:var(--ok); margin-top:1px;}
-
 /* Primary button — white with brass text */
 .stApp [data-testid="stBaseButton-primary"]{
   background:#ffffff; color:var(--brass-ink); border:1px solid var(--brass);
@@ -130,7 +108,6 @@ header[data-testid="stHeader"]{display:none;}
   background:var(--brass-tint); border-color:var(--brass-ink);}
 .stApp [data-testid="stBaseButton-primary"]:disabled{
   background:#ffffff; color:var(--muted); border-color:var(--line);}
-
 /* Widget labels and radio options. Streamlit renders these through generated
    classes that inherit a default text colour, so they need to be set here or
    they sit almost invisible against the paper background. */
@@ -148,7 +125,6 @@ header[data-testid="stHeader"]{display:none;}
 [data-testid="stFileUploaderDropzoneInstructions"] span,
 [data-testid="stFileUploaderDropzoneInstructions"] small{color:var(--slate) !important;}
 .le-uploadhint{font-size:12.5px; color:var(--muted); margin:6px 0 0 0;}
-
 /* Uploader and download buttons — same white/brass treatment as the primary.
    !important is needed: Streamlit's generated classes outrank plain selectors. */
 [data-testid="stFileUploaderDropzone"] button,
@@ -175,7 +151,6 @@ header[data-testid="stHeader"]{display:none;}
 [data-testid="stFileUploaderDropzone"] button [data-testid="stMarkdownContainer"]{
   display:none;}
 [data-testid="stFileUploaderDropzone"] button::after{content:"Import documents";}
-
 /* Delete buttons stay a bare x — no label, no pseudo-element, brass icon. */
 [data-testid="stFileUploaderDeleteBtn"]::after,
 [data-testid="stFileUploaderDeleteBtn"] *::after{content:none !important;}
@@ -188,7 +163,6 @@ header[data-testid="stHeader"]{display:none;}
 [data-testid="stFileUploaderDeleteBtn"] svg{
   color:var(--brass-ink) !important; fill:currentColor;}
 [data-testid="stFileUploaderDeleteBtn"]:hover svg{color:var(--danger) !important;}
-
 /* Notices — white ground, brass rule, ink text. Streamlit's default success
    and warning colours are tinted panels whose text drops out against them. */
 .le-note{display:flex; gap:11px; align-items:flex-start; background:var(--card);
@@ -199,7 +173,6 @@ header[data-testid="stHeader"]{display:none;}
 .le-note strong{color:var(--ink);}
 .le-note-error{border-left-color:var(--danger);}
 .le-note-error svg{color:var(--danger);}
-
 /* Risk band — the four colours are set per-run from the computed score. */
 .le-band{display:flex; gap:18px; align-items:center; background:var(--band-tint,#fff);
   border:1px solid var(--band-line,var(--line)); border-left:6px solid var(--band,var(--brass));
@@ -215,7 +188,6 @@ header[data-testid="stHeader"]{display:none;}
 .le-meter span{width:14px; height:26px; border-radius:2px; background:#ffffff;
   border:1px solid var(--band-line,var(--line));}
 .le-meter span.on{background:var(--band,var(--brass)); border-color:var(--band,var(--brass));}
-
 /* Severity pills inside the risk table */
 .le-sev{display:inline-block; font-size:11.5px; font-weight:700; letter-spacing:.05em;
   text-transform:uppercase; padding:3px 9px; border-radius:999px; border:1px solid;
@@ -224,7 +196,22 @@ header[data-testid="stHeader"]{display:none;}
 .le-sev-high{color:#9c410a; background:#fdf0e6; border-color:#eec9a8;}
 .le-sev-medium{color:#7d6f00; background:#fbf8e0; border-color:#ddd18f;}
 .le-sev-low{color:#17603c; background:#e9f5ee; border-color:#a8d4bd;}
-
+/* Nothing may escape the report card. Long reference numbers, URLs and
+   unbroken strings wrap instead of pushing the layout wider. */
+[data-testid="stVerticalBlockBorderWrapper"] *{
+  overflow-wrap:anywhere; word-break:break-word; min-width:0;}
+[data-testid="stVerticalBlockBorderWrapper"]{padding:4px 6px;}
+[data-testid="stVerticalBlockBorderWrapper"] table{
+  display:block; width:100%; overflow-x:auto; border-collapse:collapse;}
+[data-testid="stVerticalBlockBorderWrapper"] td,
+[data-testid="stVerticalBlockBorderWrapper"] th{
+  padding:8px 10px; vertical-align:top;}
+[data-testid="stVerticalBlockBorderWrapper"] pre,
+[data-testid="stVerticalBlockBorderWrapper"] code{
+  white-space:pre-wrap; overflow-wrap:anywhere;}
+/* If a stray equation survives, let it scroll rather than break the page. */
+[data-testid="stVerticalBlockBorderWrapper"] .katex-display{
+  overflow-x:auto; overflow-y:hidden;}
 /* Result card + alerts */
 [data-testid="stVerticalBlockBorderWrapper"]{
   border:1px solid var(--band-line,var(--line))!important;
@@ -236,41 +223,11 @@ header[data-testid="stHeader"]{display:none;}
 [data-testid="stAlert"] p, [data-testid="stAlert"] div, [data-testid="stAlert"] li{
   color:var(--ink)!important;}
 .le-meta{font-size:13px; color:var(--muted);}
-
-/* Steps */
-.le-steps{display:grid; grid-template-columns:repeat(3,1fr); gap:14px;}
-.le-step{background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
-  padding:22px;}
-.le-step-num{font-family:Georgia, serif; font-size:15px; font-weight:700; color:var(--brass-ink);
-  letter-spacing:.08em; text-transform:uppercase; margin-bottom:10px;}
-.le-step h4{margin:0 0 8px 0; font-size:16.5px;}
-.le-step p{margin:0; font-size:13.5px; line-height:1.6; color:var(--muted);}
-
-/* What you get */
-.le-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
-.le-item{background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
-  padding:16px 18px;}
-.le-item h4{margin:0 0 4px 0; font-size:14.5px;}
-.le-item p{margin:0; font-size:13px; line-height:1.55; color:var(--muted);}
-
-/* Why trust */
-.le-why{background:var(--ink); border-radius:var(--radius); padding:30px 32px; margin:0;}
-.le-why h3{color:#ffffff; font-family:Georgia, serif; font-size:22px; margin:0 0 16px 0;}
-.le-why ul{list-style:none; margin:0; padding:0; display:grid;
-  grid-template-columns:1fr 1fr; gap:12px 28px;}
-.le-why li{color:#c7d2dd; font-size:13.5px; line-height:1.6; padding-left:26px; position:relative;}
-.le-why li::before{content:""; position:absolute; left:0; top:4px; width:14px; height:14px;
-  border:2px solid var(--brass); border-radius:50%;}
-.le-why li::after{content:""; position:absolute; left:4.5px; top:8px; width:6px; height:3.5px;
-  border-left:2px solid var(--brass); border-bottom:2px solid var(--brass);
-  transform:rotate(-45deg);}
-
 /* FAQ */
 [data-testid="stExpander"]{background:var(--card); border:1px solid var(--line)!important;
   border-radius:8px; margin-bottom:10px;}
 [data-testid="stExpander"] summary{font-weight:600; color:var(--ink);}
 [data-testid="stExpander"] p, [data-testid="stExpander"] li{font-size:14px; color:var(--slate);}
-
 /* Footer */
 .le-footer{background:var(--ink); border-radius:var(--radius); padding:30px 32px; margin-top:44px;}
 .le-footer-brand{display:flex; align-items:center; gap:10px; margin-bottom:12px;}
@@ -279,12 +236,8 @@ header[data-testid="stHeader"]{display:none;}
 .le-footer p{color:#c7d2dd; font-size:12.5px; line-height:1.7; margin:0 0 10px 0; max-width:880px;}
 .le-footer .le-footline{color:#8fa2b4; font-size:12px; border-top:1px solid #2e465c;
   padding-top:14px; margin-top:6px;}
-
 @media (max-width:900px){
   .le-stats{grid-template-columns:1fr 1fr;}
-  .le-steps{grid-template-columns:1fr;}
-  .le-grid{grid-template-columns:1fr;}
-  .le-why ul{grid-template-columns:1fr;}
   .le-topnote{display:none;}
   .le-panelhead{flex-wrap:wrap;}
 }
@@ -334,46 +287,68 @@ def _price() -> str:
 
 
 def delivery_panel(analysis, document_names: list[str]) -> None:
-    """Email the finished report, after payment.
+    """Email the finished review.
 
-    The report stays on screen either way. What is being sold is the emailed
-    copy, so nothing already shown is taken away from the reader.
+    Two modes, driven by PAYMENTS_ENABLED. While charging is off the review is
+    sent free: no price, no payment step, and no cooling-off consent, because
+    none of that applies where there is no sale. The order is still recorded, so
+    delivery, retries and the retention rules behave identically either way.
     """
+    if PAYMENTS_ENABLED:
+        blurb = (f"We will send the full review to your address as a file you "
+                 f"can keep, for {_price()}. The copy on this page stays where "
+                 f"it is.")
+        button = f"Pay {_price()} and email it to me"
+    else:
+        blurb = ("We will send the full review to your address as a file you can "
+                 "keep. It is free while Legal-Eye is in early access.")
+        button = "Email the review to me"
+
     st.markdown(
         f"""
 <div class="le-section" style="margin:34px 0 14px 0;">
   <h2>Email me this review</h2>
-  <p>We will send the full review to your address as a file you can keep, for
-  {_price()}. The copy on this page stays where it is.</p>
+  <p>{blurb}</p>
 </div>
 """,
         unsafe_allow_html=True,
     )
 
+    # A console sender writes to the server log and delivers nothing. Say so
+    # rather than reporting a success the reader will never receive.
+    if EMAIL_PROVIDER == "console":
+        notice(
+            "<strong>Email is not configured.</strong> EMAIL_PROVIDER is set to "
+            "'console', so the review is written to the server log instead of "
+            "being sent. Set EMAIL_PROVIDER and RESEND_API_KEY to deliver for real.",
+            icon=ALERT, kind="le-note-error",
+        )
+
     with st.form("deliver_report"):
         email = st.text_input("Email address", placeholder="you@company.co.za")
-        consent = st.checkbox(
-            "Send my review immediately. I understand that because delivery "
-            "starts straight away, the seven-day cooling-off right in section 44 "
-            "of the Electronic Communications and Transactions Act falls away "
-            "under section 42(2)(d).",
-            value=False,
-        )
+        consent = True
+        if PAYMENTS_ENABLED:
+            consent = st.checkbox(
+                "Send my review immediately. I understand that because delivery "
+                "starts straight away, the seven-day cooling-off right in "
+                "section 44 of the Electronic Communications and Transactions "
+                "Act falls away under section 42(2)(d).",
+                value=False,
+            )
         marketing = st.checkbox(
             "Occasionally email me about Legal-Eye. Unticked means we only use "
             "your address to send this one review.",
             value=False,
         )
-        submitted = st.form_submit_button(f"Pay {_price()} and email it to me",
-                                          type="primary")
+        submitted = st.form_submit_button(button, type="primary")
 
     st.markdown(
-        f'<div class="le-uploadhint">Your address is used to deliver this review '
-        f"and to keep the order record. It is not shared, and it is not added to "
-        f"any mailing list unless you tick the box above. Reports are removed "
-        f"from our records after the retention period. See our "
-        f"<a href='https://legal-eye.co.za/terms'>terms</a> and "
-        f"<a href='https://legal-eye.co.za/privacy'>privacy notice</a>.</div>",
+        '<div class="le-uploadhint">Your address is used to deliver this review '
+        "and to keep the order record. It is not shared, and it is not added to "
+        "any mailing list unless you tick the box above. Reports are removed "
+        "from our records after the retention period. See our "
+        "<a href='https://legal-eye.co.za/terms'>terms</a> and "
+        "<a href='https://legal-eye.co.za/privacy'>privacy notice</a>.</div>",
         unsafe_allow_html=True,
     )
 
@@ -381,17 +356,16 @@ def delivery_panel(analysis, document_names: list[str]) -> None:
         return
 
     if not valid_email(email):
-        notice("That does not look like an email address. Please check it and try "
-               "again.", icon=ALERT, kind="le-note-error")
+        notice("That does not look like an email address. Please check it and "
+               "try again.", icon=ALERT, kind="le-note-error")
         return
 
-    if not consent:
+    if PAYMENTS_ENABLED and not consent:
         notice("Please tick the box confirming you want the review sent "
                "immediately. We need that confirmation on record before we can "
                "deliver, and you can read why in our "
-               "<a href='https://legal-eye.co.za/terms'>terms</a>. If you would rather keep the "
-               "seven-day cooling-off right, contact us and we will hold the "
-               "order instead.", icon=ALERT, kind="le-note-error")
+               "<a href='https://legal-eye.co.za/terms'>terms</a>.",
+               icon=ALERT, kind="le-note-error")
         return
 
     try:
@@ -400,36 +374,39 @@ def delivery_panel(analysis, document_names: list[str]) -> None:
             email=email,
             report=analysis.summary,
             document_names=document_names,
-            amount_cents=REPORT_PRICE_CENTS,
+            amount_cents=REPORT_PRICE_CENTS if PAYMENTS_ENABLED else 0,
             risk_score=analysis.score,
             risk_band=analysis.band,
             marketing_opt_in=marketing,
             currency=REPORT_CURRENCY,
             immediate_delivery_consent=consent,
         )
-        with st.spinner("Confirming payment and sending your review..."):
+        spinner = ("Confirming payment and sending your review..."
+                   if PAYMENTS_ENABLED else "Sending your review...")
+        with st.spinner(spinner):
             delivered = fulfil_order(
                 _order_store(),
                 order,
                 get_provider(PAYMENT_PROVIDER, allow_dev=PAYMENTS_ALLOW_DEV),
                 _email_sender(),
+                charging=PAYMENTS_ENABLED,
             )
     except PaymentError as exc:
         notice(f"Payment could not be completed. {html.escape(str(exc))}",
                icon=ALERT, kind="le-note-error")
         return
     except EmailError as exc:
-        notice("Your payment went through, but the email did not send: "
-               f"{html.escape(str(exc))} Please contact us with your order "
-               "reference and we will resend it.", icon=ALERT, kind="le-note-error")
+        notice(f"The email did not send. {html.escape(str(exc))} Your review is "
+               "still on this page, and you can try again.",
+               icon=ALERT, kind="le-note-error")
         return
     except OrderError as exc:
         notice(html.escape(str(exc)), icon=ALERT, kind="le-note-error")
         return
 
-    notice(f"Sent to <strong>{html.escape(delivered.email)}</strong>. Order "
-           f"reference <strong>{delivered.id[:12]}</strong>. If it has not "
-           "arrived in a few minutes, check your spam folder.")
+    notice(f"Sent to <strong>{html.escape(delivered.email)}</strong>. Reference "
+           f"<strong>{delivered.id[:12]}</strong>. If it has not arrived in a "
+           "few minutes, check your spam folder.")
 
 
 # --------------------------------------------------------------------------
@@ -456,6 +433,18 @@ BANDS: dict[str, tuple[str, str, str, str, str]] = {
 _SEVERITY_CELL = re.compile(
     r"(?<=\|)(\s*)\*{0,2}(Critical|High|Medium|Low)\*{0,2}(\s*)(?=\|)"
 )
+
+
+def escape_currency(markdown: str) -> str:
+    """Stop Streamlit reading currency amounts as LaTeX math.
+
+    Streamlit renders $...$ as inline maths. A paragraph containing two amounts,
+    say $1,391,189.00 and $2,583,637.55, therefore has everything between them
+    swallowed into an equation: serif italic, spaces stripped, and no wrapping,
+    so it overflows the container. Escaping every dollar sign avoids it. Reports
+    never contain intentional LaTeX, so nothing legitimate is lost.
+    """
+    return (markdown or "").replace("\\$", "$").replace("$", "\\$")
 
 
 def colour_severities(markdown: str) -> str:
@@ -495,51 +484,10 @@ def render_risk_band(score: int, band: str) -> None:
     )
 
 
-SITE_URL = "https://legal-eye.co.za"  # change to the real domain before launch
-
-STRUCTURED_DATA = """
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  "name": "Legal-Eye",
-  "applicationCategory": "BusinessApplication",
-  "description": "AI contract review for South Africa. Upload a lease, offer to purchase, employment contract, suretyship or commercial agreement and get a risk rating out of 10, the clauses that matter, and the South African statutes the document engages.",
-  "operatingSystem": "Web",
-  "areaServed": {"@type": "Country", "name": "South Africa"},
-  "inLanguage": "en-ZA",
-  "audience": {"@type": "Audience", "audienceType": "South African businesses, attorneys, landlords, tenants and property buyers"},
-  "featureList": [
-    "Contract review against South African law",
-    "Consumer Protection Act and National Credit Act checks",
-    "Alienation of Land Act formality checks for property sales",
-    "South African ID, CIPC, VAT and trust number validation",
-    "Risk rating out of 10",
-    "Scanned PDF OCR"
-  ]
-}
-</script>
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
-    {"@type": "Question", "name": "Does Legal-Eye work for South African contracts?",
-     "acceptedAnswer": {"@type": "Answer", "text": "Yes. Legal-Eye is built for South African law, applying the Consumer Protection Act 68 of 2008, National Credit Act 34 of 2005, Alienation of Land Act 68 of 1981, ECTA 25 of 2002, Companies Act 71 of 2008 and Rental Housing Act 50 of 1999, along with leading South African cases. Amounts are read in Rand and South African ID, CIPC, VAT and trust numbers are validated."}},
-    {"@type": "Question", "name": "Is AI contract review legal advice in South Africa?",
-     "acceptedAnswer": {"@type": "Answer", "text": "No. Legal-Eye is an automated document triage tool, not a law firm, and no attorney-client relationship is created. Under the Legal Practice Act 28 of 2014 only an admitted legal practitioner may appear in court or prepare documents for legal proceedings. Use Legal-Eye to identify what needs an attorney's attention."}},
-    {"@type": "Question", "name": "Which South African documents can Legal-Eye review?",
-     "acceptedAnswer": {"@type": "Answer", "text": "Lease and rental agreements, offers to purchase and deeds of sale, employment contracts, suretyships, loan and credit agreements, shareholder agreements, NDAs, service agreements and supplier contracts."}},
-    {"@type": "Question", "name": "Is Legal-Eye POPIA compliant?",
-     "acceptedAnswer": {"@type": "Answer", "text": "Documents are read in memory and deleted immediately after analysis. Personal identifiers such as South African ID numbers, email addresses and account numbers are replaced with placeholders before any text is sent for analysis, and restored only in the report shown to you. Analysis is performed by a third-party AI provider outside South Africa, disclosed as required by section 18 of POPIA."}}
-  ]
-}
-</script>
-"""
-st.markdown(STRUCTURED_DATA, unsafe_allow_html=True)
 
 # --------------------------------------------------------------------------
-# Top bar + hero
+# Header. Kept to a single render call: the landing page does the explaining,
+# so this page only has to say what it is and get out of the way.
 # --------------------------------------------------------------------------
 st.markdown(
     f"""
@@ -550,38 +498,11 @@ st.markdown(
 
 <div class="le-hero">
   <div class="le-eyebrow">AI Contract Review · South Africa</div>
-  <h1>Know what you're signing, under South African law.</h1>
-  <p class="le-sub">Upload a lease, an offer to purchase, a suretyship or an
-  employment contract. About a minute later you get back the parties, the
-  obligations, the clauses worth arguing about, and a risk score out of 10.
-  Every review is run against the South African statutes that decide these
-  disputes in practice: the Consumer Protection Act, the National Credit Act,
-  the Alienation of Land Act and the rest.</p>
-  <div class="le-chips">
-    <span class="le-chip">Built for South African law</span>
-    <span class="le-chip">Rand amounts, SA statutes, SA case law</span>
-    <span class="le-chip">PDF, DOCX and TXT, scans included</span>
-    <span class="le-chip">Your file is deleted after analysis</span>
-  </div>
-</div>
-""",
-    unsafe_allow_html=True,
-)
-
-# --------------------------------------------------------------------------
-# Trust stats — every number below is a real property of the software.
-# --------------------------------------------------------------------------
-st.markdown(
-    """
-<div class="le-stats">
-  <div class="le-stat"><div class="le-stat-value">17</div>
-    <div class="le-stat-label">South African statutes checked, from the CPA to the Companies Act</div></div>
-  <div class="le-stat"><div class="le-stat-value">6</div>
-    <div class="le-stat-label">SA identifiers verified: ID numbers, CIPC registrations, VAT and trust numbers</div></div>
-  <div class="le-stat"><div class="le-stat-value">2</div>
-    <div class="le-stat-label">analysis passes. The facts are checked in code before the report is written</div></div>
-  <div class="le-stat"><div class="le-stat-value">0</div>
-    <div class="le-stat-label">files stored. Documents are read in memory and deleted when analysis ends</div></div>
+  <h1>Review a contract.</h1>
+  <p class="le-sub">Upload up to five documents. They are checked against the
+  South African statutes that decide these disputes, and you get the parties,
+  the obligations, the clauses worth arguing about and a risk score out of 10.
+  <a href="https://legal-eye.co.za/">How it works</a>.</p>
 </div>
 """,
     unsafe_allow_html=True,
@@ -662,6 +583,10 @@ st.markdown(
 # Results — same pipeline as before, presented in a card.
 # --------------------------------------------------------------------------
 if run and uploaded_files:
+    # Imported at the point of use, not at module level. It pulls in the OpenAI
+    # client, which is dead weight on a page load where nobody runs an analysis.
+    from backend.summarizer import analyze_legal_document
+
     files = list(uploaded_files[:MAX_FILES])
     temp_paths: list[str] = []
     try:
@@ -733,7 +658,8 @@ if run and uploaded_files:
         # colour_severities adds the pills, so HTML has to render rather than
         # appear as literal tags.
         with st.container(border=True):
-            st.markdown(colour_severities(summary), unsafe_allow_html=True)
+            st.markdown(escape_currency(colour_severities(summary)),
+                        unsafe_allow_html=True)
 
         # The free download is replaced by paid delivery. The review itself
         # stays on screen; what is sold is the copy you can keep and forward.
@@ -752,195 +678,27 @@ if run and uploaded_files:
             Path(path).unlink(missing_ok=True)
 
 # --------------------------------------------------------------------------
-# How the review works
-# --------------------------------------------------------------------------
-st.markdown(
-    """
-<div class="le-section">
-  <h2>How the South African review works</h2>
-  <p>Two passes, a verification layer written in plain code, then South African
-  law applied on top. The findings that matter never rest on the model doing the
-  sum correctly, or on it remembering a section number.</p>
-</div>
-<div class="le-steps">
-  <div class="le-step"><div class="le-step-num">Step 1 of 3 · Extract</div>
-    <h4>The facts are recorded</h4>
-    <p>The document and its attachments are read, and the facts are written
-    down as structured data: amounts, payment dates, parties, quantities.
-    Nothing is judged at this stage.</p></div>
-  <div class="le-step"><div class="le-step-num">Step 2 of 3 · Verify</div>
-    <h4>The arithmetic is redone</h4>
-    <p>The numbers are worked out again in plain code. Does the payment schedule
-    reconcile to the total? Does a South African ID number pass its checksum? Was
-    the company registered at CIPC before the date it supposedly signed?</p></div>
-  <div class="le-step"><div class="le-step-num">Step 3 of 3 · Apply SA law</div>
-    <h4>The report is written</h4>
-    <p>Only the statutes your document actually engages are applied. The Rental
-    Housing Act for a lease, the Alienation of Land Act for a sale of property.
-    Every citation is then checked against a curated list before you see it.</p></div>
-</div>
-""",
-    unsafe_allow_html=True,
-)
-
-# --------------------------------------------------------------------------
-# What you get
-# --------------------------------------------------------------------------
-st.markdown(
-    """
-<div class="le-section">
-  <h2>What every South African contract review contains</h2>
-  <p>Always the same headings, in the same order, in clean Markdown.</p>
-</div>
-<div class="le-grid">
-  <div class="le-item"><h4>Document Risk Rating</h4><p>A score out of 10 at the top of the page. The worst finding sets a floor and the rest add to it.</p></div>
-  <div class="le-item"><h4>Read This First</h4><p>The four to eight things that actually matter, ahead of everything else.</p></div>
-  <div class="le-item"><h4>South African Law Notes</h4><p>The statutes your document engages, from the CPA to the Alienation of Land Act, and where it falls short of them.</p></div>
-  <div class="le-item"><h4>Legal &amp; Regulatory Exposure</h4><p>FICA, POPIA, exchange control and licensing flags, so a lawyer sees their part first.</p></div>
-  <div class="le-item"><h4>Executive Summary</h4><p>Document type, purpose and the key commercial terms.</p></div>
-  <div class="le-item"><h4>Parties</h4><p>Every party and its role. Anything left undefined or named two different ways is flagged.</p></div>
-  <div class="le-item"><h4>Obligations</h4><p>Who must do what, by when, and for how much.</p></div>
-  <div class="le-item"><h4>Critical Clauses</h4><p>Termination, liability, indemnity, intellectual property, renewal and governing law.</p></div>
-  <div class="le-item"><h4>Risk Assessment</h4><p>A table of risk, severity and reason. Severity runs all the way to Critical.</p></div>
-  <div class="le-item"><h4>Recommendations</h4><p>Concrete steps to take before you sign or pay, ordered so the urgent ones come first.</p></div>
-  <div class="le-item"><h4>Legal Disclaimer</h4><p>A fixed disclaimer closes every report. There are no exceptions.</p></div>
-</div>
-""",
-    unsafe_allow_html=True,
-)
-
-# --------------------------------------------------------------------------
-# Why trust it
-# --------------------------------------------------------------------------
-st.markdown(
-    """
-<div class="le-section">
-  <h2>Built to be defensible</h2>
-  <p>Nothing here rests on the model having a good day. The serious work is reproducible.</p>
-</div>
-<div class="le-why">
-  <h3>Why the numbers can be trusted</h3>
-  <ul>
-    <li>The risk score comes from arithmetic and calendar checks written in plain code, so the same document always scores the same.</li>
-    <li>Citations are limited to a curated list of South African statutes and judgments, and every one is checked before it reaches you.</li>
-    <li>Red-flag emphasis is capped in every report, so the serious findings are not buried in noise.</li>
-    <li>Scans, password-protected files, bad keys and rate limits all produce a plain message rather than a traceback.</li>
-  </ul>
-</div>
-""",
-    unsafe_allow_html=True,
-)
-
-# --------------------------------------------------------------------------
-# FAQ
-# --------------------------------------------------------------------------
-st.markdown(
-    """
-<div class="le-section">
-  <h2>Common questions about contract review in South Africa</h2>
-</div>
-""",
-    unsafe_allow_html=True,
-)
-
-with st.expander("Does Legal-Eye work for South African contracts?"):
-    st.markdown(
-        "Yes. It is built for South African law specifically, not adapted to it. "
-        "Reviews apply the Consumer Protection Act 68 of 2008, the National Credit "
-        "Act 34 of 2005, the Alienation of Land Act 68 of 1981, the Electronic "
-        "Communications and Transactions Act 25 of 2002, the Companies Act 71 of "
-        "2008 and the Rental Housing Act 50 of 1999, among others, together with "
-        "the leading judgments on contract such as *Beadica 231 CC v Trustees "
-        "Oregon Trust* and *Barkhuizen v Napier*. Amounts are read in Rand. South "
-        "African ID numbers, CIPC registration numbers, VAT numbers and Master's "
-        "Office trust numbers are checked arithmetically."
-    )
-
-with st.expander("Is this legal advice?"):
-    st.markdown(
-        "No. Legal-Eye is an automated triage tool, not a law firm, and using it "
-        "creates no attorney and client relationship. Under the Legal Practice Act "
-        "28 of 2014, only an admitted legal practitioner may appear in court or "
-        "prepare documents for use in legal proceedings. Legal-Eye does neither, "
-        "and it should not be used for court papers. Use it to work out what needs "
-        "an attorney's attention, then take it to one."
-    )
-
-with st.expander("Which South African documents can it review?"):
-    st.markdown(
-        "Lease and rental agreements, offers to purchase and deeds of sale, "
-        "employment contracts, suretyships, loan and credit agreements, "
-        "shareholder and sale-of-business agreements, NDAs, service agreements "
-        "and supplier contracts. It also handles commercial offer letters and "
-        "deal bundles with attached exhibits."
-    )
-
-with st.expander("Is my document stored anywhere, and is it POPIA compliant?"):
-    st.markdown(
-        "Your file is read in memory, written to a temporary location only while "
-        "being analysed, and deleted immediately afterwards. Nothing is stored, "
-        "logged or shared. Before any text is sent for analysis, personal "
-        "identifiers are replaced with placeholders. That covers South African ID "
-        "numbers, email addresses, telephone numbers and account numbers. They are "
-        "restored only in the report on your screen. Analysis is performed by a "
-        "third-party AI provider outside South Africa. That is disclosed here, as "
-        "section 18 of POPIA requires."
-    )
-
-with st.expander("Can it invent a section number or a case?"):
-    st.markdown(
-        "This is the risk that matters most, and it is handled directly. South "
-        "African courts have ordered costs against practitioners personally and "
-        "referred them to the Legal Practice Council for filing AI-fabricated "
-        "authorities. *Mavundla v MEC: COGTA KZN* and *Northbound Processing v "
-        "SADPMR* are the cautionary cases. Legal-Eye may cite only from a curated, "
-        "human-checked list of South African statutes and judgments, and every "
-        "citation in the output is measured against that list before you see it. "
-        "Anything outside the list is flagged as unverified rather than published "
-        "as fact."
-    )
-
-with st.expander("Which file formats are supported?"):
-    st.markdown(
-        "PDF, DOCX and TXT, including text inside DOCX tables. Scanned PDFs with "
-        "no text layer are read with OCR on your own machine, which matters here, "
-        "since most signed South African agreements arrive as scans."
-    )
-
-with st.expander("Can it get things wrong?"):
-    st.markdown(
-        "Yes. Any AI tool can misread a document, and OCR can misread names, "
-        "figures and dates. That is why the verification pass redoes the "
-        "arithmetic in plain code rather than trusting the model, why citations "
-        "are restricted to a curated list, and why every report ends with a "
-        "disclaimer. Check anything important against the original. Confirm "
-        "statutory thresholds with an attorney as well, since several are flagged "
-        "in the reports as needing confirmation."
-    )
-
-# --------------------------------------------------------------------------
-# Footer
+# Footer. Deliberately short: the landing page carries the explanatory content,
+# and duplicating it here cost about five seconds of render time per visit.
+# What stays is what the tool page itself needs, which is the disclaimer.
 # --------------------------------------------------------------------------
 st.markdown(
     f"""
 <div class="le-footer">
   <div class="le-footer-brand">{SCALES}<span>LEGAL-EYE</span></div>
-  <p><strong style="color:#fff">AI contract review for South Africa.</strong>
-  Legal-Eye reviews leases, offers to purchase, employment contracts,
-  suretyships, loan agreements and commercial contracts against South African
-  law, including the Consumer Protection Act, the National Credit Act, the
-  Alienation of Land Act, ECTA, POPIA, FICA and the Companies Act. You get a
-  risk rating out of 10 and the clauses that need attention.</p>
   <p><strong style="color:#fff">Legal disclaimer.</strong> Legal-Eye is an
   automated document triage tool for informational purposes only. It is not
   legal advice, it creates no attorney and client relationship, and it must not
   be used to prepare documents for court proceedings. AI systems can misstate or
-  invent legal authorities, so verify every statutory reference and case citation
-  against a primary South African source before relying on it. Document text is
-  processed by a third-party AI provider outside South Africa. Consult an
-  admitted South African legal practitioner before acting.</p>
-  <p class="le-footline">© {date.today().year} Legal-Eye. Contract review for
-  South Africa. Documents are deleted the moment analysis ends.</p>
+  invent legal authorities, so verify every statutory reference and case
+  citation against a primary South African source before relying on it. Document
+  text is processed by a third-party AI provider outside South Africa. Consult
+  an admitted South African legal practitioner before acting.</p>
+  <p><a href="https://legal-eye.co.za/">About Legal-Eye</a> &middot;
+     <a href="https://legal-eye.co.za/terms">Terms</a> &middot;
+     <a href="https://legal-eye.co.za/privacy">Privacy notice</a></p>
+  <p class="le-footline">&copy; {date.today().year} Legal-Eye. Contract review
+  for South Africa. Documents are deleted the moment analysis ends.</p>
 </div>
 """,
     unsafe_allow_html=True,

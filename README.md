@@ -69,6 +69,8 @@ python -m venv .venv
 
 # 2. Install dependencies
 pip install -r requirements.txt
+# and, to run the tests:
+pip install -r requirements-dev.txt
 
 # 3. Add your API key
 copy .env.example .env          # Windows  (macOS/Linux: cp .env.example .env)

@@ -19,6 +19,7 @@ def fulfil_order(
     provider: PaymentProvider,
     sender: EmailSender,
     callback_payload: dict | None = None,
+    charging: bool = True,
 ) -> Order:
     """Verify payment, email the report, and record the delivery.
 
@@ -30,7 +31,13 @@ def fulfil_order(
     if order.status not in ("pending", "paid", "failed"):
         raise OrderError(f"Order {order.id} is already {order.status}.")
 
-    if order.status != "paid":
+    if not charging:
+        # Nothing is being sold, so there is no payment to confirm. The order is
+        # still recorded, which keeps delivery, retries and the POPIA retention
+        # rules working exactly as they do for a paid review.
+        if order.status != "paid":
+            order = mark_paid(store, order.id, "free", "no-charge")
+    elif order.status != "paid":
         try:
             reference = provider.confirm(order, callback_payload or {})
         except PaymentError as exc:
@@ -38,7 +45,9 @@ def fulfil_order(
             raise
         order = mark_paid(store, order.id, provider.name, reference)
 
-    if not order.immediate_delivery_consent:
+    # ECTA s 42(2)(d) only matters where there is a sale. A free review engages
+    # no cooling-off right, so no consent record is required for one.
+    if charging and not order.immediate_delivery_consent:
         raise OrderError(
             "This order has no record of consent to immediate delivery. Under "
             "ECTA s 42(2)(d) the seven-day cooling-off right falls away only "
