@@ -21,6 +21,7 @@ import io
 import re
 from dataclasses import dataclass
 from datetime import date
+from pathlib import Path
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_LEFT
@@ -32,6 +33,7 @@ from reportlab.platypus import (
     PageTemplate, Paragraph, Spacer, Table, TableStyle,
 )
 
+from backend import languages
 from backend.branding import (
     BRASS, BRASS_INK, DANGER, INK, LINE, MUTED, PAPER, SLATE, TAGLINE,
     WORDMARK, band_colours, SEVERITY_COLOURS, scales_drawing,
@@ -45,9 +47,44 @@ MARGIN_TOP = 22 * mm
 MARGIN_BOTTOM = 20 * mm
 CONTENT_WIDTH = PAGE_SIZE[0] - 2 * MARGIN_X
 
-BODY_FONT = "Helvetica"
-BODY_BOLD = "Helvetica-Bold"
-DISPLAY_FONT = "Times-Bold"
+def _register_fonts() -> tuple[str, str, str]:
+    """Use DejaVu when it is installed, and fall back to the built-ins.
+
+    ReportLab's standard fourteen fonts are WinAnsi encoded. That happens to
+    cover Afrikaans, but it covers it by luck rather than design, and any
+    character outside Latin-1 renders as a solid black box: a silent corruption
+    of a legal document, which is the worst way for this to fail. DejaVu is
+    Unicode and ships with fonts-dejavu-core, which packages.txt installs.
+
+    Falling back rather than raising keeps a developer without the package
+    working, at the cost of the coverage.
+    """
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    candidates = (
+        "/usr/share/fonts/truetype/dejavu",
+        "/usr/share/fonts/dejavu",
+        "/Library/Fonts",
+        "C:/Windows/Fonts",
+    )
+    faces = (("LE-Sans", "DejaVuSans.ttf"),
+             ("LE-Sans-Bold", "DejaVuSans-Bold.ttf"),
+             ("LE-Serif-Bold", "DejaVuSerif-Bold.ttf"))
+    for directory in candidates:
+        base = Path(directory)
+        if not all((base / filename).exists() for _, filename in faces):
+            continue
+        try:
+            for name, filename in faces:
+                pdfmetrics.registerFont(TTFont(name, str(base / filename)))
+        except Exception:  # noqa: BLE001 - any font error means fall back
+            break
+        return "LE-Sans", "LE-Sans-Bold", "LE-Serif-Bold"
+    return "Helvetica", "Helvetica-Bold", "Times-Bold"
+
+
+BODY_FONT, BODY_BOLD, DISPLAY_FONT = _register_fonts()
 
 DISCLAIMER = (
     "This review was produced with AI assistance for informational purposes "
@@ -122,9 +159,12 @@ def _styles() -> dict[str, ParagraphStyle]:
         "bullet": ParagraphStyle(
             "bullet", parent=base, spaceAfter=3, leading=14,
         ),
+        # Not Helvetica-Oblique: that is a built-in, so it would drop back to
+        # Latin-1 coverage for one paragraph style and lose characters the rest
+        # of the document renders correctly.
         "quote": ParagraphStyle(
             "quote", parent=base, leftIndent=10, borderPadding=0,
-            textColor=colors.HexColor(MUTED), fontName="Helvetica-Oblique",
+            textColor=colors.HexColor(MUTED),
         ),
         "cell": ParagraphStyle(
             "cell", parent=base, fontSize=8.8, leading=12.5, spaceAfter=0,
@@ -185,12 +225,17 @@ class _RiskBanner(Flowable):
     HEIGHT = 26 * mm
 
     def __init__(self, width: float, score: int | None, band: str | None,
-                 note: str) -> None:
+                 note: str, band_label: str | None = None,
+                 risk_word: str = "risk") -> None:
         super().__init__()
         self.width = width
         self.height = self.HEIGHT
         self.score = score
+        # `band` stays in English because it selects the colour; `band_label` is
+        # what the reader sees.
         self.band = (band or "Unrated").title()
+        self.band_label = band_label or self.band
+        self.risk_word = risk_word
         self.note = note
 
     def draw(self) -> None:
@@ -216,7 +261,7 @@ class _RiskBanner(Flowable):
         text_left = pad + 24 * mm
         c.setFont(BODY_BOLD, 8.6)
         c.drawString(text_left, self.height - 8.5 * mm,
-                     f"{self.band.upper()} RISK", charSpace=1.4)
+                     f"{self.band_label} {self.risk_word}".upper(), charSpace=1.4)
 
         # Reserve the meter's column before wrapping, or the note runs under it.
         seg_w, gap = 3.4 * mm, 1.0 * mm
@@ -459,28 +504,39 @@ class _Rule(Flowable):
 # --------------------------------------------------------------------------
 # Running header and footer
 # --------------------------------------------------------------------------
-def _decorate(canvas_obj, doc) -> None:
-    canvas_obj.saveState()
-    width, height = PAGE_SIZE
+def _decorator(footer: str, page_word: str):
+    """Build the per-page callback.
 
-    if doc.page > 1:
-        canvas_obj.setFont(BODY_BOLD, 7.2)
-        canvas_obj.setFillColor(colors.HexColor(BRASS_INK))
-        canvas_obj.drawString(MARGIN_X, height - 13 * mm, WORDMARK, charSpace=1.2)
+    A closure rather than a module-level function because ReportLab hands the
+    callback only (canvas, doc), and the running footer now has to be in the
+    reader's language.
+    """
+
+    def decorate(canvas_obj, doc) -> None:
+        canvas_obj.saveState()
+        width, height = PAGE_SIZE
+
+        if doc.page > 1:
+            canvas_obj.setFont(BODY_BOLD, 7.2)
+            canvas_obj.setFillColor(colors.HexColor(BRASS_INK))
+            canvas_obj.drawString(MARGIN_X, height - 13 * mm, WORDMARK,
+                                  charSpace=1.2)
+            canvas_obj.setStrokeColor(colors.HexColor(LINE))
+            canvas_obj.setLineWidth(0.5)
+            canvas_obj.line(MARGIN_X, height - 15.5 * mm,
+                            width - MARGIN_X, height - 15.5 * mm)
+
         canvas_obj.setStrokeColor(colors.HexColor(LINE))
         canvas_obj.setLineWidth(0.5)
-        canvas_obj.line(MARGIN_X, height - 15.5 * mm,
-                        width - MARGIN_X, height - 15.5 * mm)
+        canvas_obj.line(MARGIN_X, 14 * mm, width - MARGIN_X, 14 * mm)
+        canvas_obj.setFont(BODY_FONT, 7.2)
+        canvas_obj.setFillColor(colors.HexColor(MUTED))
+        canvas_obj.drawString(MARGIN_X, 10 * mm, footer)
+        canvas_obj.drawRightString(width - MARGIN_X, 10 * mm,
+                                   f"{page_word} {doc.page}")
+        canvas_obj.restoreState()
 
-    canvas_obj.setStrokeColor(colors.HexColor(LINE))
-    canvas_obj.setLineWidth(0.5)
-    canvas_obj.line(MARGIN_X, 14 * mm, width - MARGIN_X, 14 * mm)
-    canvas_obj.setFont(BODY_FONT, 7.2)
-    canvas_obj.setFillColor(colors.HexColor(MUTED))
-    canvas_obj.drawString(MARGIN_X, 10 * mm,
-                          "Automated review. Informational only, not legal advice.")
-    canvas_obj.drawRightString(width - MARGIN_X, 10 * mm, f"Page {doc.page}")
-    canvas_obj.restoreState()
+    return decorate
 
 
 # --------------------------------------------------------------------------
@@ -489,8 +545,11 @@ def _decorate(canvas_obj, doc) -> None:
 def render_report_pdf(report_markdown: str, document_names: list[str],
                       risk_score: int | None, risk_band: str | None,
                       order_reference: str,
-                      generated_on: date | None = None) -> bytes:
+                      generated_on: date | None = None,
+                      language: str = "en") -> bytes:
     """The finished review as PDF bytes, ready to attach."""
+    lang = languages.get(language)
+    text = lang.strings
     styles = _styles()
     buffer = io.BytesIO()
 
@@ -505,10 +564,16 @@ def render_report_pdf(report_markdown: str, document_names: list[str],
     frame = Frame(MARGIN_X, MARGIN_BOTTOM, CONTENT_WIDTH,
                   PAGE_SIZE[1] - MARGIN_TOP - MARGIN_BOTTOM, id="body")
     doc.addPageTemplates([
-        PageTemplate(id="all", frames=[frame], onPage=_decorate),
+        PageTemplate(id="all", frames=[frame],
+                     onPage=_decorator(text["footer"], text["page"])),
     ])
 
+    # The band note comes from the language pack when there is one, so the
+    # banner does not sit in English above a translated report.
     _, _, _, _, note = band_colours(risk_band)
+    band_key = (risk_band or "").strip().title()
+    if band_key in lang.bands:
+        _, note = lang.bands[band_key]
     documents = ", ".join(document_names) if document_names else "your document"
     when = (generated_on or date.today()).strftime("%d %B %Y")
 
@@ -524,14 +589,26 @@ def render_report_pdf(report_markdown: str, document_names: list[str],
         _Rule(CONTENT_WIDTH, BRASS, 1.0),
         Spacer(1, 7),
         Paragraph(
-            f"Document review &nbsp;·&nbsp; prepared {_html.escape(when)} "
-            f"&nbsp;·&nbsp; reference {_html.escape(order_reference)}",
+            f"{_html.escape(text['document_review'])} &nbsp;·&nbsp; "
+            f"{_html.escape(text['prepared'])} {_html.escape(when)} "
+            f"&nbsp;·&nbsp; {_html.escape(text['reference'])} "
+            f"{_html.escape(order_reference)}",
             styles["meta"],
         ),
         Spacer(1, 11),
-        _RiskBanner(CONTENT_WIDTH, risk_score, risk_band, note),
+        _RiskBanner(CONTENT_WIDTH, risk_score, risk_band, note,
+                    lang.bands.get(band_key, (None,))[0],
+                    text["risk_suffix"]),
         Spacer(1, 14),
     ]
+
+    # A translated review says so before the reader relies on it, not in the
+    # small print at the end.
+    for line in languages.notices(lang):
+        story.append(Paragraph(_html.escape(line), styles["meta"]))
+    if languages.notices(lang):
+        story.append(Spacer(1, 10))
+
     story.extend(_markdown_flowables(body, styles))
 
     # Only add the standing disclaimer if the review did not already close with

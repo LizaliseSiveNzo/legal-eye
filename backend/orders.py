@@ -73,6 +73,10 @@ class Order:
     # reads as an attempt to exclude a Chapter VII right, which s 48 makes void.
     immediate_delivery_consent: bool = False
     consent_at: str | None = None
+    # Stored, not derived: a retry reads the order back from the database with
+    # no session behind it, and a review written in isiZulu must not come back
+    # wrapped in an English email.
+    language: str = "en"
     created_at: str = field(default_factory=_now)
     paid_at: str | None = None
     delivered_at: str | None = None
@@ -125,6 +129,7 @@ class SQLiteOrderStore:
                     marketing_opt_in INTEGER NOT NULL DEFAULT 0,
                     immediate_delivery_consent INTEGER NOT NULL DEFAULT 0,
                     consent_at TEXT,
+                    language TEXT NOT NULL DEFAULT 'en',
                     created_at TEXT NOT NULL,
                     paid_at TEXT,
                     delivered_at TEXT,
@@ -139,6 +144,7 @@ class SQLiteOrderStore:
             for column, definition in (
                 ("immediate_delivery_consent", "INTEGER NOT NULL DEFAULT 0"),
                 ("consent_at", "TEXT"),
+                ("language", "TEXT NOT NULL DEFAULT 'en'"),
             ):
                 if column not in existing:
                     connection.execute(
@@ -193,7 +199,7 @@ _COLUMNS = (
     "id", "email", "document_names", "amount_cents", "currency", "status",
     "risk_score", "risk_band", "report", "provider", "provider_reference",
     "marketing_opt_in", "immediate_delivery_consent", "consent_at",
-    "created_at", "paid_at", "delivered_at", "failure_reason",
+    "language", "created_at", "paid_at", "delivered_at", "failure_reason",
 )
 _TIMESTAMPS = ("consent_at", "created_at", "paid_at", "delivered_at")
 
@@ -343,6 +349,7 @@ def create_order(
     marketing_opt_in: bool = False,
     currency: str = "ZAR",
     immediate_delivery_consent: bool = False,
+    language: str = "en",
 ) -> Order:
     """Record a pending order. Nothing is charged and nothing is sent yet."""
     address = (email or "").strip().lower()
@@ -365,6 +372,7 @@ def create_order(
         marketing_opt_in=bool(marketing_opt_in),
         immediate_delivery_consent=bool(immediate_delivery_consent),
         consent_at=_now() if immediate_delivery_consent else None,
+        language=language or "en",
     )
     store.save(order)
     return order

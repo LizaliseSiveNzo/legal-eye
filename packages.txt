@@ -1,2 +1,9 @@
 tesseract-ocr
 tesseract-ocr-eng
+# Afrikaans scans are ordinary in South African property, agricultural and
+# estate work. Without this pack they OCR into noise that the analysis then
+# treats as real text, which is worse than failing to read them at all.
+tesseract-ocr-afr
+# Unicode font for the PDF. ReportLab's built-in fonts are WinAnsi encoded, so
+# any character outside Latin-1 renders as a solid black box.
+fonts-dejavu-core
