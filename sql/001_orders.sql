@@ -2,14 +2,15 @@
 -- Mirrors backend/orders.py so SQLiteOrderStore can be swapped for
 -- PostgresOrderStore without changing any caller.
 --
--- Applied to Supabase project mvgxiukcymgeqzghybqv on 2026-08-16 as migration
--- legal_eye_orders.
+-- Applied to Supabase project jyrzkfjvwtwaqiagjumg ("legal-eye", eu-west-3) on
+-- 2026-08-16 as migration legal_eye_orders.
 --
--- Deliberately NOT in the public schema. That project already carries a
--- public.orders table belonging to a different application, holding customer
--- names, phone numbers and street addresses. A separate schema keeps the two
--- apart, and because Supabase exposes only the schemas listed in its API
--- config, legal_eye is unreachable through PostgREST by default.
+-- Kept out of the public schema even though the project is dedicated to
+-- Legal-Eye. Supabase serves only the schemas listed in its API config, so a
+-- table in legal_eye is unreachable through PostgREST by default. These rows
+-- hold an email address and the full report body, and the cheapest way to
+-- guarantee no browser ever reads them is for the API not to know they exist.
+-- Set ORDERS_SCHEMA if you would rather use public.
 
 create schema if not exists legal_eye;
 
