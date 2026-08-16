@@ -58,6 +58,16 @@ SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USERNAME: str = os.getenv("SMTP_USERNAME", "").strip()
 SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
 
+# Postgres when set, SQLite when not. This has to be set in any deployment whose
+# filesystem does not survive a restart, which includes Streamlit Community
+# Cloud: an order written to orders.db there is gone the next time the app
+# sleeps, along with the retention purge and the record of what was sent to whom.
+#
+# Use Supabase's transaction pooler host, not db.<ref>.supabase.co. The direct
+# host resolves to IPv6 only, which most managed hosts cannot reach.
+DATABASE_URL: str = os.getenv("DATABASE_URL", "").strip()
+ORDERS_SCHEMA: str = os.getenv("ORDERS_SCHEMA", "legal_eye").strip()
+
 ORDERS_DB_PATH: str = os.getenv("ORDERS_DB_PATH", str(PROJECT_ROOT / "orders.db"))
 # POPIA s 14: report bodies are dropped this many days after delivery. The order
 # record itself is kept, because that is the financial record.

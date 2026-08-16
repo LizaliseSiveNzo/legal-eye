@@ -1,8 +1,19 @@
 -- Legal-Eye orders, for Supabase or any Postgres.
--- Mirrors backend/orders.py so SQLiteOrderStore can be swapped for a Supabase
--- store without changing any caller.
+-- Mirrors backend/orders.py so SQLiteOrderStore can be swapped for
+-- PostgresOrderStore without changing any caller.
+--
+-- Applied to Supabase project mvgxiukcymgeqzghybqv on 2026-08-16 as migration
+-- legal_eye_orders.
+--
+-- Deliberately NOT in the public schema. That project already carries a
+-- public.orders table belonging to a different application, holding customer
+-- names, phone numbers and street addresses. A separate schema keeps the two
+-- apart, and because Supabase exposes only the schemas listed in its API
+-- config, legal_eye is unreachable through PostgREST by default.
 
-create table if not exists orders (
+create schema if not exists legal_eye;
+
+create table if not exists legal_eye.orders (
     id                 text primary key,
     email              text        not null,
     document_names     jsonb       not null default '[]'::jsonb,
@@ -26,30 +37,34 @@ create table if not exists orders (
     failure_reason     text
 );
 
-create index if not exists orders_status_idx     on orders (status);
-create index if not exists orders_email_idx      on orders (lower(email));
-create index if not exists orders_delivered_idx  on orders (delivered_at)
+create index if not exists orders_status_idx    on legal_eye.orders (status);
+create index if not exists orders_email_idx     on legal_eye.orders (lower(email));
+create index if not exists orders_delivered_idx on legal_eye.orders (delivered_at)
     where delivered_at is not null;
 
--- Orders hold an email address and the full report, so no browser client should
--- ever read this table directly. Enable RLS with no public policy and reach it
--- only from the server using the service role key.
-alter table orders enable row level security;
+-- Orders hold an email address and the full report body, so no browser client
+-- should ever read this table. RLS on, no policy, and the API roles revoked:
+-- reachable only from the server with the service role, which bypasses RLS.
+alter table legal_eye.orders enable row level security;
+
+revoke all on schema legal_eye from anon, authenticated;
+revoke all on legal_eye.orders from anon, authenticated;
 
 -- POPIA s 14. Drop report bodies once they are no longer needed, keeping the
 -- financial record. Schedule with pg_cron:
 --   select cron.schedule('purge-reports','0 3 * * *',
---                        $$select purge_delivered_reports(30)$$);
-create or replace function purge_delivered_reports(older_than_days integer default 30)
+--                        $$select legal_eye.purge_delivered_reports(30)$$);
+create or replace function legal_eye.purge_delivered_reports(
+    older_than_days integer default 30)
 returns integer
 language plpgsql
 security definer
-set search_path = public
+set search_path = legal_eye, pg_temp
 as $$
 declare
     purged integer;
 begin
-    update orders
+    update legal_eye.orders
        set report = null
      where status = 'delivered'
        and delivered_at is not null
@@ -59,3 +74,6 @@ begin
     return purged;
 end;
 $$;
+
+revoke all on function legal_eye.purge_delivered_reports(integer)
+    from anon, authenticated, public;

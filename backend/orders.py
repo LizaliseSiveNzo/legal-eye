@@ -21,6 +21,7 @@ than by good intentions.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import sqlite3
 import uuid
@@ -184,6 +185,147 @@ class SQLiteOrderStore:
                 (DELIVERED, cutoff),
             )
             return cursor.rowcount
+
+
+_SCHEMA_RE = re.compile(r"^[a-z_][a-z0-9_]*$")
+
+_COLUMNS = (
+    "id", "email", "document_names", "amount_cents", "currency", "status",
+    "risk_score", "risk_band", "report", "provider", "provider_reference",
+    "marketing_opt_in", "immediate_delivery_consent", "consent_at",
+    "created_at", "paid_at", "delivered_at", "failure_reason",
+)
+_TIMESTAMPS = ("consent_at", "created_at", "paid_at", "delivered_at")
+
+
+def _to_datetime(value: str | None) -> datetime | None:
+    """ISO string to datetime, for a timestamptz column."""
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+    return datetime.fromisoformat(value)
+
+
+def _to_iso(value) -> str | None:
+    """Whatever Postgres handed back, as the ISO string the Order expects."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return str(value)
+
+
+class PostgresOrderStore:
+    """Orders in Postgres, for any deployment whose disk does not survive.
+
+    This exists because SQLite on Streamlit Community Cloud is a trap. The
+    container filesystem is rebuilt whenever the app restarts, so orders.db and
+    every order in it disappear without an error anywhere: the retention purge
+    has nothing to purge, a delivery cannot be retried, and the POPIA record of
+    what was sent to whom is simply gone.
+
+    A connection is opened per operation rather than held open. Streamlit reruns
+    the script constantly and a cached connection goes stale across reruns, while
+    the order volume here is a handful of statements per delivery, so the
+    simplest correct thing is also fast enough.
+    """
+
+    def __init__(self, dsn: str, schema: str = "legal_eye") -> None:
+        if not dsn:
+            raise OrderError("No database URL was configured.")
+        if not _SCHEMA_RE.match(schema):
+            # A schema name cannot be a bound parameter, so it is interpolated.
+            # Validating it is what stops that being an injection point.
+            raise OrderError(f"Unsafe schema name: {schema!r}")
+        self.dsn = dsn
+        self.schema = schema
+        self._table = f"{schema}.orders"
+
+    def _connect(self):
+        import psycopg
+
+        # prepare_threshold=None disables prepared statements. Supabase's
+        # transaction-mode pooler hands a different backend connection to each
+        # transaction, so a statement prepared on one is not there on the next.
+        return psycopg.connect(self.dsn, prepare_threshold=None, connect_timeout=10)
+
+    def save(self, order: Order) -> None:
+        data = asdict(order)
+        data["document_names"] = json.dumps(order.document_names)
+        for key in _TIMESTAMPS:
+            data[key] = _to_datetime(data[key])
+        values = [data[column] for column in _COLUMNS]
+
+        placeholders = ", ".join(
+            "%s::jsonb" if column == "document_names" else "%s"
+            for column in _COLUMNS
+        )
+        updates = ", ".join(
+            f"{column} = excluded.{column}" for column in _COLUMNS if column != "id"
+        )
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                f"INSERT INTO {self._table} ({', '.join(_COLUMNS)}) "
+                f"VALUES ({placeholders}) "
+                f"ON CONFLICT (id) DO UPDATE SET {updates}",
+                values,
+            )
+
+    def get(self, order_id: str) -> Order | None:
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                f"SELECT {', '.join(_COLUMNS)} FROM {self._table} WHERE id = %s",
+                (order_id,),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        data = dict(zip(_COLUMNS, row))
+        # jsonb comes back already decoded; a text column would not.
+        if isinstance(data["document_names"], str):
+            data["document_names"] = json.loads(data["document_names"])
+        for key in _TIMESTAMPS:
+            data[key] = _to_iso(data[key])
+        data["marketing_opt_in"] = bool(data["marketing_opt_in"])
+        data["immediate_delivery_consent"] = bool(data["immediate_delivery_consent"])
+        return Order(**data)
+
+    def purge_delivered_reports(self, older_than_days: int = 30) -> int:
+        """Drop report bodies from orders delivered more than N days ago.
+
+        Deliberately written in Python rather than calling the SQL function of
+        the same name, so the behaviour is identical whichever store is in use.
+        The order row stays, because it is the financial record; only the
+        document text goes, which is the personal information no longer needed.
+        """
+        cutoff = datetime.now(timezone.utc) - timedelta(days=older_than_days)
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                f"UPDATE {self._table} SET report = NULL "
+                "WHERE status = %s AND delivered_at IS NOT NULL "
+                "AND delivered_at < %s AND report IS NOT NULL",
+                (DELIVERED, cutoff),
+            )
+            return cursor.rowcount
+
+
+def get_order_store(database_url: str = "", sqlite_path: str | Path = "orders.db",
+                    schema: str = "legal_eye") -> OrderStore:
+    """Postgres when a database URL is configured, SQLite otherwise.
+
+    Falling back to SQLite keeps local development working with no service to
+    run. It is the wrong choice in a deployment with an ephemeral disk, so that
+    case is logged loudly rather than passing silently.
+    """
+    if database_url:
+        return PostgresOrderStore(database_url, schema=schema)
+    logging.getLogger(__name__).warning(
+        "No DATABASE_URL set, so orders are stored in the SQLite file %s. On a "
+        "host with an ephemeral filesystem this loses every order on restart.",
+        sqlite_path,
+    )
+    return SQLiteOrderStore(sqlite_path)
 
 
 # ---------------------------------------------------------------------------

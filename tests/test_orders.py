@@ -248,3 +248,40 @@ def test_consent_and_marketing_are_independent(store: SQLiteOrderStore) -> None:
                          immediate_delivery_consent=True)
     assert order.immediate_delivery_consent is True
     assert order.marketing_opt_in is False
+
+
+# --- durable storage -------------------------------------------------------
+
+def test_the_store_falls_back_to_sqlite_without_a_database_url(tmp_path) -> None:
+    from backend.orders import SQLiteOrderStore, get_order_store
+
+    store = get_order_store("", tmp_path / "orders.db")
+    assert isinstance(store, SQLiteOrderStore)
+
+
+def test_a_database_url_selects_postgres() -> None:
+    """Selecting the store must not open a connection, so this needs no server."""
+    from backend.orders import PostgresOrderStore, get_order_store
+
+    store = get_order_store("postgresql://user:pw@example.invalid:6543/postgres")
+    assert isinstance(store, PostgresOrderStore)
+    assert store._table == "legal_eye.orders"
+
+
+def test_an_unsafe_schema_name_is_refused() -> None:
+    """The schema cannot be a bound parameter, so it must be validated instead."""
+    from backend.orders import PostgresOrderStore
+
+    with pytest.raises(OrderError, match="Unsafe schema"):
+        PostgresOrderStore("postgresql://x@y/z", schema="public; drop table orders--")
+
+
+def test_timestamps_survive_the_round_trip() -> None:
+    """Order holds ISO strings; timestamptz hands back datetimes."""
+    from datetime import datetime, timezone
+    from backend.orders import _to_datetime, _to_iso
+
+    original = "2026-08-16T14:30:00+00:00"
+    assert _to_iso(_to_datetime(original)) == original
+    assert _to_datetime(None) is None and _to_iso(None) is None
+    assert _to_iso(datetime(2026, 1, 1, tzinfo=timezone.utc)) == "2026-01-01T00:00:00+00:00"

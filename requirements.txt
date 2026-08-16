@@ -15,3 +15,8 @@ pillow>=10.0.0
 # HTML-to-PDF engine would need pango and cairo through packages.txt, and a
 # deploy that dies on a missing shared object is worse than writing the layout.
 reportlab>=4.0.0
+
+# Orders in Postgres. Required on any host with an ephemeral filesystem, which
+# includes Streamlit Community Cloud, where the SQLite fallback silently loses
+# every order on restart. Point DATABASE_URL at Supabase's transaction pooler.
+psycopg[binary]>=3.1

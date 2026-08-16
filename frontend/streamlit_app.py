@@ -20,9 +20,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from backend.parser import extract_document  # noqa: E402
 from backend.config import (  # noqa: E402
+    DATABASE_URL,
     EMAIL_FROM,
     EMAIL_PROVIDER,
     ORDERS_DB_PATH,
+    ORDERS_SCHEMA,
     PAYMENT_PROVIDER,
     PAYMENTS_ALLOW_DEV,
     PAYMENTS_ENABLED,
@@ -32,8 +34,8 @@ from backend.config import (  # noqa: E402
 )
 from backend.delivery import fulfil_order  # noqa: E402
 from backend.mailer import ConsoleSender, EmailError, ResendSender  # noqa: E402
-from backend.orders import SQLiteOrderStore, create_order  # noqa: E402
-from backend.orders import OrderError, valid_email  # noqa: E402
+from backend.orders import create_order, get_order_store  # noqa: E402
+from backend.orders import OrderError, OrderStore, valid_email  # noqa: E402
 from backend.payments import PaymentError, get_provider  # noqa: E402
 
 MAX_FILES = 5  # hard cap: the bundle is reviewed as one combined document
@@ -271,8 +273,15 @@ def notice(body: str, icon: str = CHECK, kind: str = "") -> None:
 
 
 @st.cache_resource
-def _order_store() -> SQLiteOrderStore:
-    return SQLiteOrderStore(ORDERS_DB_PATH)
+@st.cache_resource(show_spinner=False)
+def _order_store() -> OrderStore:
+    """Postgres in deployment, SQLite locally.
+
+    Cached because it is built on every rerun otherwise, and the SQLite branch
+    runs its migration each time it is constructed. The store itself holds no
+    open connection, so caching it across reruns is safe.
+    """
+    return get_order_store(DATABASE_URL, ORDERS_DB_PATH, ORDERS_SCHEMA)
 
 
 def _email_sender():
