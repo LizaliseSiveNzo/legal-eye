@@ -152,11 +152,13 @@ def test_doctrine_block_renders_statements() -> None:
 
 
 def test_worst_case_pack_stays_under_budget() -> None:
-    """The full pack (everything triggered at once) must stay far under the
-    50,000-character input cap even though the document shares that budget."""
+    """The full pack (every statute, authority and doctrine injected at once)
+    is a synthetic ceiling: selection is trigger-based, so no real document
+    can reach it. It must still fit comfortably inside the model context
+    alongside a full 50,000-character document."""
     block = reference_block(list(STATUTES))  # all statutes + all authorities
     block += "\n" + doctrine_block(list(DOCTRINES))
-    assert len(block) < 45_000, len(block)
+    assert len(block) < 55_000, len(block)
 
 
 def test_realistic_selection_stays_lean() -> None:
@@ -175,3 +177,36 @@ def test_realistic_selection_stays_lean() -> None:
     block += "\n" + doctrine_block(doctrines)
     assert len(block) < 15_000, len(block)
     assert "Rental Housing Act" in block
+
+
+# --- end-to-end wiring ------------------------------------------------------
+
+
+def test_za_analysis_injects_the_pack_into_the_prompt() -> None:
+    """The mocked pipeline must actually send the doctrine and statute pack."""
+    from unittest.mock import MagicMock, patch
+
+    from backend import summarizer
+
+    fake = MagicMock()
+    message = MagicMock()
+    message.content = "# Executive Summary\nA lease."
+    choice = MagicMock()
+    choice.message = message
+    response = MagicMock()
+    response.choices = [choice]
+    fake.chat.completions.create.return_value = response
+
+    with patch.object(summarizer, "_get_client", return_value=fake):
+        summarizer.summarize_legal_document(
+            "The tenant shall pay R12,000 per month within 7 days of invoice.",
+            jurisdiction="ZA",
+        )
+
+    # The final (analysis) call carries the pack in its user message.
+    last_call = fake.chat.completions.create.call_args_list[-1]
+    user_content = last_call.kwargs["messages"][1]["content"]
+    assert "SOUTH AFRICAN LAW REFERENCE PACK" in user_content
+    assert "COMMON LAW DOCTRINES" in user_content
+    assert "Consumer Protection Act 68 of 2008" in user_content  # "tenant" trigger
+    assert "Barkhuizen" in user_content  # core authority always present

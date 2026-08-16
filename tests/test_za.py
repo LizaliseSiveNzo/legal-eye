@@ -121,6 +121,23 @@ def test_branch_codes() -> None:
     ("Deed of suretyship; the surety binds himself.", "SURETYSHIP"),
     ("39,748.27 carats of rough diamonds, wire transfer in USD.", "MINERALS"),
     ("The Trust, represented by its trustees, purchases the plant.", "TRUST_PROPERTY"),
+    ("Interest on late payment at the prescribed rate.", "PRESCRIBED_INTEREST"),
+    ("The company is in liquidation and its assets are being wound up.", "INSOLVENCY"),
+    ("The seller is married in community of property to Mrs X.", "MATRIMONIAL"),
+    ("The purchaser undertakes not to compete within the province for 3 years.", "COMPETITION"),
+    ("No gift, gratification or facilitation payment shall be offered.", "PRECCA"),
+    ("Notice shall be given on 20 business days' written notice.", "INTERPRETATION_ACT"),
+    ("Payment by cheque drawn on a registered bank.", "BILLS_EXCHANGE"),
+    ("The tenant authorises a monthly debit order against its account.", "NPS"),
+    ("The price is exclusive of VAT; a tax invoice will be issued.", "VAT"),
+    ("The unit in the sectional title scheme attracts a monthly levy.", "SECTIONAL_TITLES"),
+    ("The occupier may be evicted only by order of court.", "PIE_ESTA"),
+    ("The employer is registered with COIDA and contributes to UIF.", "COIDA_UIF"),
+    ("The insurer shall indemnify the policyholder under the policy.", "INSURANCE"),
+    ("This agreement is with the municipality following a tender award.", "PUBLIC_PROCUREMENT"),
+    ("The executor shall wind up the deceased estate.", "WILLS_ESTATES"),
+    ("The parties concluded a customary marriage and lobola was paid.", "CUSTOMARY"),
+    ("Collection costs and the debt collector's commission are payable.", "DEBT_COLLECTORS"),
 ])
 def test_triggers_select_the_right_statute(text: str, expected: str) -> None:
     assert expected in {s.key for s in applicable_statutes(text)}
@@ -139,6 +156,25 @@ def test_wire_transfer_does_not_trigger_the_land_statute() -> None:
 
 def test_documents_with_no_trigger_still_get_the_general_framework() -> None:
     assert [s.key for s in applicable_statutes("qqq zzz")] == ["PRESCRIPTION", "JURISDICTION"]
+
+
+def test_bare_word_will_does_not_trigger_wills_act() -> None:
+    """'will' is an auxiliary verb in every contract; only will-specific
+    phrases may pull in the Wills Act."""
+    keys = {s.key for s in applicable_statutes("The parties will deliver the goods.")}
+    assert "WILLS_ESTATES" not in keys
+
+
+def test_tender_of_performance_triggers_nothing_odd() -> None:
+    """'tender' in the performance sense may pull in procurement law — that is
+    accepted noise — but must not mislabel the document."""
+    keys = {s.key for s in applicable_statutes("Tender of payment shall be made in cash.")}
+    assert "ALIENATION_LAND" not in keys
+
+
+def test_every_new_statute_title_is_self_consistent() -> None:
+    for statute in STATUTES:
+        assert unknown_citations(statute.title) == [], statute.title
 
 
 def test_reference_block_states_the_citation_limit() -> None:

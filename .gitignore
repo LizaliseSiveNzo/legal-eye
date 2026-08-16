@@ -12,6 +12,8 @@ venv/
 .kun-canvas/
 .deepseekgui-images/
 img/
+.kunsdd/
+_to_delete/
 
 # Order database. Contains customer emails and report text.
 orders.db

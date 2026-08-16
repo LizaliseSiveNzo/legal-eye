@@ -22,6 +22,16 @@ file, and anything else it produces is flagged before the reader sees it.
 Every entry carries the date it was verified and a confidence level. Where the
 research could not confirm a commencement date or a threshold, the entry says
 so rather than stating it as settled.
+
+Pack history:
+- 2.0 (2026-08-16): 17 statutes added (prescribed interest, insolvency,
+  matrimonial property, competition, PRECCA, interpretation of time, bills of
+  exchange, payment systems, VAT, sectional titles/CSOS, PIE/ESTA, COIDA/UIF,
+  insurance, public procurement, wills/estates, customary marriages, debt
+  collection); NCA ss 89-90 added; 28 leading authorities added; the citation
+  guard now recognises SA-style, AD and provincial-division citations;
+  authorities are injected selectively rather than all at once.
+- 1.0 (2026-08-14): initial 17 statutes and 12 authorities.
 """
 
 from __future__ import annotations
@@ -128,6 +138,14 @@ STATUTES: tuple[Statute, ...] = (
             "default administration and collection costs may not exceed the unpaid "
             "principal as at the date of default. Run this alongside the common-law "
             "rule; they can give different answers.",
+            "s 90(2) — unlawful provisions are VOID. The list is long but closed: "
+            "terms that defeat the Act's purposes, misrepresent the price or the "
+            "parties' rights, waive common-law protections, or authorise entry onto "
+            "premises or unlawful collection practices. Test every suspicious term "
+            "against the list.",
+            "s 89 — unlawful credit agreements: among others, agreements by "
+            "unregistered providers, negative-option marketing agreements, and "
+            "ancillary arrangements that defeat the Act. Void from inception.",
         ),
         "medium",
         "Repo rate 7.00% as at the MPC meeting of 23 July 2026 — recalculate the "
@@ -401,6 +419,358 @@ STATUTES: tuple[Statute, ...] = (
             "The buyer's own licensing position matters as much as the seller's. "
             "Check for a licence warranty and the licence number.",
         ),
+    ),
+    Statute(
+        "PRESCRIBED_INTEREST", "Prescribed Rate of Interest Act 55 of 1975",
+        ("interest rate", "prime rate", "mora interest", "prescribed rate",
+         "late payment", "per annum", "accrue"),
+        "Any debt where interest runs and no rate is agreed, or where the parties "
+        "adopt the prescribed rate.",
+        (
+            "s 1(1) — a debt bears interest at the prescribed rate from when it is "
+            "due, where no other rate is agreed or set by law.",
+            "The prescribed rate is the repo rate plus 3.5 percentage points "
+            "(GN R1077 in GG 37970 of 8 September 2014). At the 7.00% repo rate of "
+            "July 2026 that is 10.5% per annum.",
+            "Parties may agree a different rate, but it is tested for reasonableness "
+            "under the common law and Barkhuizen, and for credit agreements the "
+            "NCA rate caps apply instead.",
+        ),
+        "medium",
+        "The prescribed rate is amended by gazette; confirm the current repo-linked "
+        "rate before quoting it.",
+    ),
+    Statute(
+        "INSOLVENCY", "Insolvency Act 24 of 1936",
+        ("insolvent", "insolvency", "sequestration", "sequestrated",
+         "winding up", "wound up", "liquidate", "liquidation",
+         "unable to pay its debts"),
+        "Any transaction with a party that is, or may become, insolvent. Companies "
+        "follow the Companies Act liquidation and business rescue regime, but these "
+        "provisions are the model for voidable dispositions and still bind natural "
+        "persons and trusts.",
+        (
+            "s 26(1) — a disposition not made for value: made within two years of "
+            "sequestration it is set aside without proving insolvency; older than "
+            "two years it is set aside only if the debtor was insolvent at the time.",
+            "s 29(1) — a disposition within six months of sequestration that "
+            "preferred one creditor above others is voidable if the debtor's "
+            "liabilities exceeded assets immediately afterwards, without proving "
+            "any intent to prefer.",
+            "s 30 — a disposition made with the intent to prefer one creditor while "
+            "insolvent is voidable, whatever its date.",
+            "s 31 — collusive dealings to prejudice other creditors are void, and "
+            "the court may set them aside.",
+            "s 34 — a trader alienating their business or its goodwill must publish "
+            "a notice and give creditors 30 days to object; without compliance the "
+            "alienation is void as against creditors.",
+        ),
+        "medium",
+        "The look-back windows and what counts as 'value' are litigated ground. "
+        "Treat these as red flags to verify with an insolvency practitioner, not "
+        "final rulings.",
+    ),
+    Statute(
+        "MATRIMONIAL", "Matrimonial Property Act 88 of 1984",
+        ("married", "marriage", "spouse", "in community of property",
+         "antenuptial", "accrual", "married in community"),
+        "Any party contracting while married in community of property.",
+        (
+            "s 15(2) — listed transactions require the other spouse's written consent "
+            "attested by two witnesses: among them, alienating or burdening immovable "
+            "property, entering a suretyship, and credit agreements regulated by the NCA.",
+            "s 15(3) — other listed transactions need the spouse's consent; the form "
+            "is looser than under s 15(2).",
+            "A transaction concluded without the required consent is invalid as "
+            "against the innocent spouse, and the requirement is enforced strictly. "
+            "Call for the marriage certificate and the consent itself.",
+        ),
+        "low",
+        "The exact effect of non-compliance (void ab initio versus voidable) has "
+        "divided the courts; flag the issue and confirm against current authority.",
+    ),
+    Statute(
+        "COMPETITION", "Competition Act 89 of 1998",
+        ("competition", "compete", "non-compete", "restraint of trade",
+         "price fixing", "collusion", "cartel", "market share", "merger",
+         "exclusive dealing", "resale price", "dominance", "dominant",
+         "exclusivity"),
+        "Agreements that restrain, restrict or distort competition: sale-of-business "
+        "or employment non-competes, exclusivity, resale price clauses, and mergers.",
+        (
+            "s 4(1)(b) — horizontal agreements between competitors are per se "
+            "prohibited: price fixing, market division, and collusive tendering.",
+            "s 5(1) — vertical agreements are prohibited if they substantially "
+            "prevent or lessen competition; minimum resale price maintenance is the "
+            "commonest trap.",
+            "s 8 — abuse of dominance: excessive pricing, exclusionary acts, "
+            "refusing access to an essential facility. Relevant where one party is "
+            "a dominant firm.",
+            "Intermediate and large mergers require Competition Commission approval "
+            "before implementation. The financial thresholds are set by the Minister "
+            "and have been amended repeatedly — do not rely on published tables.",
+        ),
+        "medium",
+        "Merger thresholds and the buyer-power provisions have changed since "
+        "commencement; confirm the current determinations before relying on them.",
+    ),
+    Statute(
+        "PRECCA", "Prevention and Combating of Corrupt Activities Act 12 of 2004",
+        ("bribe", "bribery", "corrupt", "corruption", "kickback", "gratification",
+         "facilitation payment", "conflict of interest"),
+        "Clauses touching gifts, hospitality, commissions to officials, "
+        "facilitation payments, or consultancy fees to politically connected persons.",
+        (
+            "s 3 — the general offence of corruption: giving or accepting any "
+            "gratification in exchange for acting dishonestly or influencing "
+            "another's conduct. It binds private parties as well as officials.",
+            "s 34 — a person in a position of authority who knows or ought to know "
+            "of corruption must report it to the police. No contract term can "
+            "override that duty.",
+            "A contract procured by bribery is tainted and may be unenforceable on "
+            "public-policy grounds, quite apart from criminal exposure.",
+        ),
+        "high",
+    ),
+    Statute(
+        "INTERPRETATION_ACT", "Interpretation Act 33 of 1957",
+        ("business day", "business days", "calendar days", "calendar day",
+         "notice period", "reckoned", "computed from", "within 30 days"),
+        "Any clause computing time: notice periods, cooling-off days, 'business "
+        "days', deadlines measured in days or months.",
+        (
+            "s 4 — when a period is reckoned in days, the first day is excluded and "
+            "the last day included. If the last day falls on a Sunday or public "
+            "holiday, the period ends on the next day that is not one.",
+            "s 2 — 'month' means a calendar month, not thirty days.",
+            "Public Holidays Act 36 of 1994 — 'public holiday' includes days declared "
+            "by proclamation; check the current list before computing a deadline.",
+        ),
+        "high",
+    ),
+    Statute(
+        "BILLS_EXCHANGE", "Bills of Exchange Act 34 of 1964",
+        ("cheque", "bill of exchange", "promissory note", "bank draft",
+         "crossed cheque"),
+        "Payment by cheque, bill of exchange or promissory note.",
+        (
+            "A promissory note is an unconditional written promise, signed by the "
+            "maker, to pay a sum certain. A cheque is a bill drawn on a banker and "
+            "payable on demand.",
+            "The instrument must be in writing and signed; the sum must be certain.",
+            "Prescription on a bill or note is six years (Prescription Act s 11(c)).",
+        ),
+        "high",
+    ),
+    Statute(
+        "NPS", "National Payment System Act 78 of 1998",
+        ("debit order", "debit orders", "eft", "electronic funds transfer",
+         "payment system", "naedo", "debicheck", "authenticated mandate",
+         "early debit order"),
+        "Debit orders, EFT mandates and other payment instructions through the "
+        "South African clearing system.",
+        (
+            "Debit orders run through a bank participating in the payment system "
+            "recognised by the SARB. The mandate must be authorised by the payer.",
+            "Unauthorised debit orders can be disputed through the payer's bank and "
+            "reversed within defined windows. A clause waiving the right to dispute "
+            "an unauthorised debit is unlikely to stand.",
+            "DebiCheck authenticated mandates are the standard for new debit orders; "
+            "the agreement should say whether the mandate is authenticated.",
+        ),
+        "medium",
+        "Payment-system rules change through PASA and SARB directives; treat the "
+        "mechanics as current practice to confirm, not fixed law.",
+    ),
+    Statute(
+        "VAT", "Value-Added Tax Act 89 of 1991",
+        ("vat", "value added tax", "tax invoice", "zero-rated", "zero rating",
+         "standard rated", "output tax", "input tax"),
+        "Any supply of goods or services, or a price clause expressed as inclusive "
+        "or exclusive of VAT.",
+        (
+            "s 7(1) — VAT is levied on the supply of goods or services by a vendor "
+            "in the course of an enterprise. The price clause must say whether the "
+            "price is inclusive or exclusive of VAT.",
+            "s 20 — a vendor must issue a tax invoice within 21 days of the supply: "
+            "a full tax invoice for R5,000 or more, an abridged one between R50 and "
+            "R5,000. A purchaser cannot claim an input credit without one.",
+            "s 11 — zero-rated supplies (for example exported goods) attract VAT at "
+            "0%; the contract should state the basis relied on.",
+        ),
+        "high",
+    ),
+    Statute(
+        "SECTIONAL_TITLES",
+        "Sectional Titles Schemes Management Act 8 of 2011 and the Community "
+        "Schemes Ombud Service Act 9 of 2011",
+        ("sectional title", "body corporate", "levy", "levies",
+         "exclusive use area", "scheme rules", "conduct rules", "unit owner",
+         "sectional plan"),
+        "Sectional title schemes: levies, body corporate duties, exclusive use "
+        "areas, conduct rules.",
+        (
+            "The body corporate owes statutory duties to maintain common property "
+            "and insure the buildings; a contract cannot contract out of them.",
+            "Members are liable for levies. Special levies require proper "
+            "decision-making; a scheme rule that conflicts with the Act or the "
+            "management rules is invalid.",
+            "Scheme disputes, including levy disputes, are routed through the "
+            "Community Schemes Ombud Service; its adjudication orders are enforceable.",
+        ),
+        "medium",
+        "Section numbers in this Act are high-traffic and frequently amended; "
+        "verify the specific provision against the current text before quoting it.",
+    ),
+    Statute(
+        "PIE_ESTA",
+        "Prevention of Illegal Eviction from and Unlawful Occupation of Land Act "
+        "19 of 1998 and the Extension of Security of Tenure Act 62 of 1997",
+        ("eviction", "evict", "unlawful occupation", "unlawful occupier",
+         "occupier", "farm dweller", "labour tenant", "esta"),
+        "Leases, sale-of-land and security arrangements that contemplate removing "
+        "an occupier.",
+        (
+            "PIE s 4 — an eviction requires a court order, obtained only after the "
+            "occupier has been given notice and the court has weighed all the "
+            "circumstances ('just and equitable'). A self-help or lockout clause is "
+            "unlawful, and unlawful eviction is an offence.",
+            "ESTA s 6 — occupiers who have lived on land with the owner's consent "
+            "have occupation rights; termination must be lawful and just and equitable.",
+            "Any clause permitting the owner to evict without a court order is "
+            "unenforceable and signals deeper trouble.",
+        ),
+        "high",
+    ),
+    Statute(
+        "COIDA_UIF",
+        "Compensation for Occupational Injuries and Diseases Act 130 of 1993 and "
+        "the Unemployment Insurance Act 63 of 2001",
+        ("coida", "occupational injury", "workplace injury", "workmen's "
+         "compensation", "uif", "unemployment insurance", "compensation for "
+         "occupational injuries"),
+        "Employment and contractor agreements, especially indemnities for "
+        "workplace injury.",
+        (
+            "COIDA s 35(1) — an employee may not claim damages from the employer "
+            "for an occupational injury; compensation is claimed under COIDA. An "
+            "employee's indemnity to the employer for such injury is ineffective.",
+            "COIDA does not protect third parties: a subcontractor injured on site "
+            "may claim from the principal contractor. Mutual indemnities between "
+            "contractors and principals carry the real risk here.",
+            "UIF — employers must register and contribute; a worker styled an "
+            "'independent contractor' who is an employee in substance attracts "
+            "UIF and COIDA obligations.",
+        ),
+        "medium",
+        "The employee-versus-independent-contractor boundary is fact-heavy and "
+        "frequently tested; flag it rather than decide it.",
+    ),
+    Statute(
+        "INSURANCE", "Insurance Act 18 of 2017",
+        ("insurer", "insured", "insurance policy", "policyholder", "premium",
+         "underwriter", "reinsurance", "claims made", "indemnity insurance"),
+        "Insurance policies, indemnity arrangements resembling insurance, premium "
+        "finance and warranty arrangements.",
+        (
+            "The Act consolidates insurance regulation; the Policyholder Protection "
+            "Rules issued under it (replacing the Long-term and Short-term "
+            "Insurance Acts' rules) govern how insurers treat policyholders.",
+            "PPR duties are strict: material terms must be disclosed in plain "
+            "language, customers treated fairly, and claims handled without "
+            "reliance on undisclosed technicalities. A policy term contradicting "
+            "the PPRs is vulnerable.",
+            "A contract under which one party assumes another's risk may be "
+            "'insurance business' requiring licensing; 'guarantee' schemes that are "
+            "insurance in substance are risky.",
+        ),
+        "medium",
+        "PPR rule numbers change; cite the duty, not the rule number, unless "
+        "verified.",
+    ),
+    Statute(
+        "PUBLIC_PROCUREMENT",
+        "Public Finance Management Act 1 of 1999 and the Preferential "
+        "Procurement Policy Framework Act 5 of 2000",
+        ("procurement", "organ of state", "public entity", "municipality",
+         "municipal", "invitation to tender", "tender award", "bidder",
+         "tender"),
+        "Contracts with organs of state: national or provincial departments, "
+        "municipalities, public entities and state-owned companies.",
+        (
+            "Constitution s 217 — procurement must be fair, equitable, transparent, "
+            "competitive and cost-effective.",
+            "PFMA — an accounting officer who commits expenditure without authority "
+            "acts irregularly; a supplier's contract with an organ of state must fit "
+            "an approved procurement process.",
+            "PPPFA — preference points must follow the prescribed framework; an "
+            "award outside it is open to review and set-aside.",
+            "A private supplier dealing with the state should confirm the "
+            "procurement authority and process in writing before performance starts.",
+        ),
+        "medium",
+        "The procurement regime has been in flux (PPPR 2022 litigation and "
+        "replacement legislation); treat the framework as a flag to verify, not "
+        "settled text.",
+    ),
+    Statute(
+        "WILLS_ESTATES", "Wills Act 7 of 1953 and the Administration of Estates "
+                         "Act 66 of 1965",
+        ("last will", "will and testament", "testator", "testatrix", "executor",
+         "executrix", "bequest", "legatee", "heir", "inheritance",
+         "deceased estate"),
+        "Documents dealing with inheritance, executors, or the estate of a "
+        "deceased person.",
+        (
+            "Wills Act s 2(1)(a) — a will must be signed at its end by the testator "
+            "(or by someone in their presence and at their direction) in the "
+            "presence of two or more competent witnesses who sign in the presence "
+            "of the testator and of each other.",
+            "A will cannot be made or varied electronically (ECTA Schedule 1); an "
+            "e-signed 'will' is invalid.",
+            "Administration of Estates Act — the estate is administered under the "
+            "Master's supervision; only the appointed executor may deal with estate "
+            "assets. Letters of executorship are the equivalent of letters of "
+            "authority for trusts.",
+        ),
+        "high",
+    ),
+    Statute(
+        "CUSTOMARY", "Recognition of Customary Marriages Act 120 of 1998",
+        ("customary marriage", "customary law", "lobola", "lobolo",
+         "customary union", "polygamous marriage"),
+        "Any party to a customary marriage, or documents referring to lobola or a "
+        "customary union.",
+        (
+            "s 3(1) — a customary marriage requires: both spouses over 18, consent "
+            "of both, and the marriage negotiated and entered into or celebrated "
+            "in accordance with customary law.",
+            "s 4(1) — the marriage must be registered within three months.",
+            "s 7(2) — a customary marriage entered into after commencement is in "
+            "community of property unless an antenuptial contract excludes it. "
+            "Subsequent (polygamous) marriages require a court-approved contract "
+            "regulating the matrimonial property system.",
+        ),
+        "medium",
+        "Property consequences of polygamous marriages follow court practice that "
+        "has shifted (Ramuhovhi v President of the RSA [2017] ZACC 41); flag and "
+        "verify.",
+    ),
+    Statute(
+        "DEBT_COLLECTORS", "Debt Collectors Act 114 of 1998",
+        ("debt collector", "collection costs", "collection commission",
+         "handed over for collection", "collections agency"),
+        "Clauses about collection costs, debt collectors, or attorneys' collection "
+        "commission.",
+        (
+            "A person who collects debts for reward must be registered as a debt "
+            "collector; an unregistered collector may not recover fees.",
+            "Collection costs must be lawful and reasonable; the tariff under the "
+            "Magistrates' Courts Rules governs attorney collection charges. A "
+            "clause imposing arbitrary collection costs is vulnerable.",
+        ),
+        "medium",
+        "Tariffs change; check the current scale before quoting it.",
     ),
 )
 
