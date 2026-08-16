@@ -30,6 +30,7 @@ from backend.config import (  # noqa: E402
     PAYMENTS_ENABLED,
     REPORT_CURRENCY,
     REPORT_PRICE_CENTS,
+    REPORT_RETENTION_DAYS,
     RESEND_API_KEY,
 )
 from backend.delivery import fulfil_order  # noqa: E402
@@ -356,9 +357,9 @@ def delivery_panel(analysis, document_names: list[str]) -> None:
         '<div class="le-uploadhint">Your address is used to deliver this review '
         "and to keep the order record. It is not shared, and it is not added to "
         "any mailing list unless you tick the box above. Reports are removed "
-        "from our records after the retention period. See our "
-        "<a href='https://legal-eye.co.za/terms'>terms</a> and "
-        "<a href='https://legal-eye.co.za/privacy'>privacy notice</a>.</div>",
+        f"from our records after {REPORT_RETENTION_DAYS} days. See our "
+        "<a href='/Terms' target='_self'>terms</a> and "
+        "<a href='/Privacy' target='_self'>privacy notice</a>.</div>",
         unsafe_allow_html=True,
     )
 
@@ -374,7 +375,7 @@ def delivery_panel(analysis, document_names: list[str]) -> None:
         notice("Please tick the box confirming you want the review sent "
                "immediately. We need that confirmation on record before we can "
                "deliver, and you can read why in our "
-               "<a href='https://legal-eye.co.za/terms'>terms</a>.",
+               "<a href='/Terms' target='_self'>terms</a>.",
                icon=ALERT, kind="le-note-error")
         return
 
@@ -512,7 +513,7 @@ st.markdown(
   <p class="le-sub">Upload up to five documents. They are checked against the
   South African statutes that decide these disputes, and you get the parties,
   the obligations, the clauses worth arguing about and a risk score out of 10.
-  <a href="https://legal-eye.co.za/">How it works</a>.</p>
+  <a href="/About" target="_self">How it works</a>.</p>
 </div>
 """,
     unsafe_allow_html=True,
@@ -734,9 +735,9 @@ st.markdown(
   citation against a primary South African source before relying on it. Document
   text is processed by a third-party AI provider outside South Africa. Consult
   an admitted South African legal practitioner before acting.</p>
-  <p><a href="https://legal-eye.co.za/">About Legal-Eye</a> &middot;
-     <a href="https://legal-eye.co.za/terms">Terms</a> &middot;
-     <a href="https://legal-eye.co.za/privacy">Privacy notice</a></p>
+  <p><a href="/About" target="_self">About Legal-Eye</a> &middot;
+     <a href="/Terms" target="_self">Terms</a> &middot;
+     <a href="/Privacy" target="_self">Privacy notice</a></p>
   <p class="le-footline">&copy; {date.today().year} Legal-Eye. Contract review
   for South Africa. Documents are deleted the moment analysis ends.</p>
 </div>
