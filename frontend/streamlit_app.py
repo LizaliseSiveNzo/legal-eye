@@ -38,6 +38,7 @@ from backend.mailer import ConsoleSender, EmailError, ResendSender  # noqa: E402
 from backend.orders import create_order, get_order_store  # noqa: E402
 from backend.orders import OrderError, OrderStore, valid_email  # noqa: E402
 from backend.payments import PaymentError, get_provider  # noqa: E402
+from backend.retention import purge_reports  # noqa: E402
 
 MAX_FILES = 5  # hard cap: the bundle is reviewed as one combined document
 
@@ -273,7 +274,6 @@ def notice(body: str, icon: str = CHECK, kind: str = "") -> None:
     )
 
 
-@st.cache_resource
 @st.cache_resource(show_spinner=False)
 def _order_store() -> OrderStore:
     """Postgres in deployment, SQLite locally.
@@ -283,6 +283,32 @@ def _order_store() -> OrderStore:
     open connection, so caching it across reruns is safe.
     """
     return get_order_store(DATABASE_URL, ORDERS_DB_PATH, ORDERS_SCHEMA)
+
+
+@st.cache_resource(ttl=60 * 60 * 24, show_spinner=False)
+def _purge_expired_reports() -> str:
+    """Honour the retention period the privacy notice publishes.
+
+    There is no scheduler on Streamlit Community Cloud, so the purge rides on
+    ordinary traffic. `ttl` makes the body run at most once a day per process
+    rather than on every rerun.
+
+    Building the store is inside the try on purpose. This runs at startup, and
+    before this existed the store was only constructed when someone actually
+    asked for delivery — so an unreachable database or a read-only disk failed
+    at the point of delivery, with a message about delivery. Constructing it
+    eagerly without catching would turn that into a blank page for someone who
+    only wanted to read a contract, which is a worse failure for a worse reason.
+
+    Best-effort by design: an app that sleeps for a week purges late rather than
+    never. If the retention promise ever has to be exact, replace this with a
+    scheduled job against the database.
+    """
+    try:
+        store = _order_store()
+    except Exception as exc:  # noqa: BLE001 — housekeeping must not break the page
+        return f"retention purge skipped, store unavailable: {exc}"
+    return str(purge_reports(store, REPORT_RETENTION_DAYS))
 
 
 def _email_sender():
@@ -495,6 +521,13 @@ def render_risk_band(score: int, band: str) -> None:
     )
 
 
+
+# --------------------------------------------------------------------------
+# Retention. Runs before anything is rendered so the promise in the privacy
+# notice is kept on ordinary traffic, and is silent on success: this is
+# housekeeping, and the reader has no interest in it.
+# --------------------------------------------------------------------------
+_purge_expired_reports()
 
 # --------------------------------------------------------------------------
 # Header. Kept to a single render call: the landing page does the explaining,
